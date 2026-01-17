@@ -1,0 +1,63 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-white text-gray-900 font-sans antialiased;
+  }
+}
+
+@layer components {
+  /* Card component */
+  .card {
+    @apply bg-white rounded-lg border border-gray-200 shadow-sm;
+  }
+
+  /* Button base */
+  .btn {
+    @apply px-4 py-2 rounded-md font-medium transition-colors duration-150;
+  }
+
+  .btn-primary {
+    @apply bg-navy-700 text-white hover:bg-navy-800;
+  }
+
+  .btn-secondary {
+    @apply bg-gray-100 text-gray-700 hover:bg-gray-200;
+  }
+
+  /* Status badges */
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .badge-success {
+    @apply bg-green-100 text-green-700;
+  }
+
+  .badge-warning {
+    @apply bg-yellow-100 text-yellow-700;
+  }
+
+  .badge-danger {
+    @apply bg-red-100 text-red-700;
+  }
+
+  /* Table styles */
+  .table-container {
+    @apply overflow-x-auto;
+  }
+
+  .data-table {
+    @apply min-w-full divide-y divide-gray-200;
+  }
+
+  .data-table th {
+    @apply px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50;
+  }
+
+  .data-table td {
+    @apply px-6 py-4 whitespace-nowrap text-sm text-gray-900;
+  }
+}
