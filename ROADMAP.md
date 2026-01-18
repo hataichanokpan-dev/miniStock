@@ -30,24 +30,27 @@
 
 ### Goal: Connect to real-time and historical stock market data
 
-#### 1.1 API Integration
+#### 1.1 API Integration ✅
 **Tasks:**
-- [ ] Select primary data provider
-  - Recommendation: Financial Modeling Prep (comprehensive, affordable)
-  - Alternative: Alpha Vantage (free tier, good for MVP)
-- [ ] Set up API key management
+- [x] Select primary data provider
+  - **Selected: Yahoo Finance** (free, no API key required, comprehensive data)
+  - Fallback: Financial Modeling Prep (comprehensive, affordable)
+  - Fallback: Alpha Vantage (free tier, good for MVP)
+- [x] Set up API key management
   - Environment variables for API keys
   - Rate limiting handler
   - Error handling & retry logic
-- [ ] Create unified data service layer
+- [x] Create unified data service layer
   - `src/lib/api/stock-api.ts` - Main API client
   - `src/lib/api/quotes.ts` - Real-time quotes
   - `src/lib/api/fundamentals.ts` - Company fundamentals
   - `src/lib/api/statements.ts` - Financial statements
-- [ ] Implement caching strategy
-  - Redis or Upstash for production
-  - In-memory cache for development
-  - Cache invalidation logic
+  - `src/lib/api/yahoo-finance.ts` - Yahoo Finance integration
+  - `src/lib/api/cache.ts` - Caching layer
+- [x] Implement caching strategy
+  - In-memory cache for development (implemented)
+  - Cache invalidation logic (TTL-based)
+  - Ready for Redis/Upstash migration in production
 - [ ] Background data refresh system
   - Cron jobs for data updates
   - WebSocket for real-time updates (optional)

@@ -4,6 +4,7 @@
  */
 
 import { apiRequest, getApiProvider } from './stock-api';
+import { getQuoteYahoo, getQuotesYahoo } from './yahoo-finance';
 import type { Quote } from '@/types/market';
 
 /**
@@ -12,7 +13,9 @@ import type { Quote } from '@/types/market';
 export async function getQuote(symbol: string): Promise<Quote> {
   const provider = getApiProvider();
 
-  if (provider === 'fmp') {
+  if (provider === 'yahoo') {
+    return getQuoteYahoo(symbol);
+  } else if (provider === 'fmp') {
     return getQuoteFMP(symbol);
   } else {
     return getQuoteAlphaVantage(symbol);
@@ -25,7 +28,9 @@ export async function getQuote(symbol: string): Promise<Quote> {
 export async function getQuotes(symbols: string[]): Promise<Quote[]> {
   const provider = getApiProvider();
 
-  if (provider === 'fmp') {
+  if (provider === 'yahoo') {
+    return getQuotesYahoo(symbols);
+  } else if (provider === 'fmp') {
     return getQuotesFMP(symbols);
   } else {
     // Alpha Vantage doesn't support batch, fetch individually
@@ -126,7 +131,11 @@ async function getQuoteAlphaVantage(symbol: string): Promise<Quote> {
 export async function getTopGainers(): Promise<Quote[]> {
   const provider = getApiProvider();
 
-  if (provider === 'fmp') {
+  if (provider === 'yahoo') {
+    // Yahoo Finance doesn't have a direct gainers endpoint
+    // Return empty array for now - can be implemented with screener
+    return [];
+  } else if (provider === 'fmp') {
     const data = await apiRequest<any[]>('actives');
     return data.slice(0, 10).map((item) => ({
       symbol: item.symbol,
