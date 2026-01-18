@@ -4,6 +4,7 @@
  */
 
 import { apiRequest, getApiProvider } from './stock-api';
+import { getCompanyMetricsYahoo, getCompanyProfileYahoo } from './yahoo-finance';
 import type { FinancialMetrics } from '@/types/financials';
 
 /**
@@ -12,7 +13,9 @@ import type { FinancialMetrics } from '@/types/financials';
 export async function getCompanyMetrics(symbol: string): Promise<FinancialMetrics> {
   const provider = getApiProvider();
 
-  if (provider === 'fmp') {
+  if (provider === 'yahoo') {
+    return getCompanyMetricsYahoo(symbol);
+  } else if (provider === 'fmp') {
     return getCompanyMetricsFMP(symbol);
   } else {
     return getCompanyMetricsAlphaVantage(symbol);
@@ -96,7 +99,9 @@ export async function getCompanyProfile(symbol: string): Promise<{
 }> {
   const provider = getApiProvider();
 
-  if (provider === 'fmp') {
+  if (provider === 'yahoo') {
+    return getCompanyProfileYahoo(symbol);
+  } else if (provider === 'fmp') {
     const profiles = await apiRequest<any[]>(`profile/${symbol}`);
     if (!profiles || profiles.length === 0) {
       throw new Error(`No profile data found for symbol: ${symbol}`);

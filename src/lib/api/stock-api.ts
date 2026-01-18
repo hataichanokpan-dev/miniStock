@@ -1,16 +1,17 @@
 /**
  * Main Stock API Client
  * Phase 1: Data Layer Foundation
- * Supports Financial Modeling Prep (FMP) and Alpha Vantage
+ * Supports Yahoo Finance, Financial Modeling Prep (FMP), and Alpha Vantage
  */
 
 import { cache, CACHE_TTL, withCache } from './cache';
 
-export type ApiProvider = 'fmp' | 'alphavantage';
+export type ApiProvider = 'yahoo' | 'fmp' | 'alphavantage';
 
 // API Configuration from environment
-const API_PROVIDER = (process.env.NEXT_PUBLIC_API_PROVIDER || 'fmp') as ApiProvider;
+const API_PROVIDER = (process.env.NEXT_PUBLIC_API_PROVIDER || 'yahoo') as ApiProvider;
 const STOCK_API_KEY = process.env.NEXT_PUBLIC_STOCK_API_KEY || '';
+const YAHOO_API_URL = process.env.NEXT_PUBLIC_YAHOO_API_URL || '';
 const FMP_API_URL = process.env.NEXT_PUBLIC_FMP_API_URL || 'https://financialmodelingprep.com/api/v3';
 const ALPHA_VANTAGE_API_URL = process.env.NEXT_PUBLIC_ALPHA_VANTAGE_API_URL || 'https://www.alphavantage.co/query';
 const RATE_LIMIT = parseInt(process.env.STOCK_API_RATE_LIMIT || '300', 10);
@@ -135,7 +136,10 @@ export async function apiRequest<T>(
   const cacheKey = buildCacheKey(endpoint, params);
 
   return withCache(cacheKey, CACHE_TTL.QUOTE, async () => {
-    if (provider === 'fmp') {
+    if (provider === 'yahoo') {
+      // Yahoo Finance uses different API pattern - handled in specific files
+      throw new Error('Yahoo Finance requests should use specific yahoo-finance functions');
+    } else if (provider === 'fmp') {
       return fetchFMP<T>(endpoint, params);
     } else {
       // Alpha Vantage uses function parameter instead of endpoint
