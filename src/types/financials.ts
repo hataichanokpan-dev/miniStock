@@ -35,6 +35,7 @@ export interface AnnualData {
   netIncome: number;
   totalAssets: number;
   totalDebt: number;
+  totalLiabilities: number;
   equity: number;
 }
 
