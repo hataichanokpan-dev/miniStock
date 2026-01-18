@@ -16,6 +16,7 @@ import { calculateValueMetrics } from '@/lib/analysis/value-scoring';
 import { calculateGrowthMetrics } from '@/lib/analysis/growth-scoring';
 import { calculateQualityMetrics } from '@/lib/analysis/quality-scoring';
 import type { AnalysisSummary } from '@/types/analysis';
+import type { AnnualData, QuarterlyData } from '@/types/financials';
 
 export async function GET(
   request: NextRequest,
@@ -41,18 +42,34 @@ export async function GET(
       getFinancialStatements(upperSymbol),
     ]);
 
-    const annualData = statements.annual || [];
-    const quarterlyData = statements.quarterly || [];
+    // Convert financial statements to AnnualData format
+    const annualData: AnnualData[] = statements.incomeStatement.map((income, i) => {
+      const balance = statements.balanceSheet[i];
+      return {
+        fiscalYear: income.fiscalYear,
+        eps: income.eps || 0,
+        revenue: income.revenue || 0,
+        netIncome: income.netIncome || 0,
+        totalAssets: balance?.totalAssets || 0,
+        totalDebt: balance?.totalDebt || 0,
+        totalLiabilities: balance?.totalLiabilities || 0,
+        equity: balance?.totalEquity || 0,
+      };
+    });
+
+    // For quarterly data, we'd need a separate call
+    // For now, use empty array
+    const quarterlyData: QuarterlyData[] = [];
 
     // Calculate CAN SLIM score
     const canslimInput = {
       symbol: upperSymbol,
-      currentPrice: quote.regularMarketPrice || 0,
-      fiftyTwoWeekHigh: quote.fiftyTwoWeekHigh || quote.regularMarketPrice || 0,
-      fiftyTwoWeekLow: quote.fiftyTwoWeekLow || quote.regularMarketPrice || 0,
+      currentPrice: quote.price || 0,
+      fiftyTwoWeekHigh: quote.high || quote.price || 0,
+      fiftyTwoWeekLow: quote.low || quote.price || 0,
       marketCap: metrics.marketCap || 0,
       volume: quote.volume || 0,
-      avgVolume: quote.averageDailyVolume10Day || quote.volume || 0,
+      avgVolume: quote.avgVolume || quote.volume || 0,
       quarterlyEarnings: quarterlyData,
       annualEarnings: annualData,
       financialMetrics: metrics,
@@ -70,7 +87,7 @@ export async function GET(
       annualData,
       industry: profile.industry || '',
       sector: profile.sector || '',
-      currentPrice: quote.regularMarketPrice || 0,
+      currentPrice: quote.price || 0,
       wacc: 0.10, // 10% discount rate
       growthRate: 0.05, // 5% growth rate
     };
@@ -80,7 +97,7 @@ export async function GET(
     const valueInput = {
       financialMetrics: metrics,
       annualData,
-      currentPrice: quote.regularMarketPrice || 0,
+      currentPrice: quote.price || 0,
     };
     const valueMetrics = calculateValueMetrics(valueInput);
 
