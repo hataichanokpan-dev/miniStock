@@ -72,8 +72,8 @@ export async function getCompanyMetricsYahoo(symbol: string): Promise<FinancialM
 
   return withCache(cacheKey, CACHE_TTL.FUNDAMENTALS, async () => {
     const [result, keyStats] = await Promise.all([
-      yahooFinance.quote(symbol),
-      yahooFinance.quoteSummary(symbol, { modules: ['defaultKeyStatistics', 'financialData'] }),
+      yahooFinance.quote(symbol) as any,
+      yahooFinance.quoteSummary(symbol, { modules: ['defaultKeyStatistics', 'financialData'] }) as any,
     ]);
 
     const stats = keyStats?.defaultKeyStatistics || {};
@@ -116,7 +116,7 @@ export async function getCompanyProfileYahoo(symbol: string): Promise<{
   return withCache(cacheKey, CACHE_TTL.FUNDAMENTALS, async () => {
     const result = await yahooFinance.quoteSummary(symbol, {
       modules: ['assetProfile', 'price'],
-    });
+    }) as any;
 
     const profile = result?.assetProfile || {};
     const price = result?.price || {};
@@ -156,7 +156,7 @@ export async function getHistoricalPricesYahoo(
       period1: getStartDate(period),
       period2: new Date(),
       interval: getInterval(period),
-    });
+    }) as any[];
 
     return result.map((item) => ({
       date: item.date.toISOString().split('T')[0],
