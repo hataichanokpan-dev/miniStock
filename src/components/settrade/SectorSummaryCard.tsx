@@ -99,29 +99,35 @@ export default function SectorSummaryCard({ sectors, limit = 6 }: SectorSummaryC
       <div className="grid grid-cols-2 sm:grid-cols-2 gap-2 sm:gap-3 pt-2 border-t border-gray-100">
         <div>
           <p className="text-xs font-medium text-green-700 mb-2">Top Gainer</p>
-          {sectors.find(s => s.chgPct === Math.max(...sectors.map(s => s.chgPct))) && (
-            <div className="bg-green-50 rounded p-2">
-              <p className="text-xs font-medium text-gray-700">
-                {sectors.find(s => s.chgPct === Math.max(...sectors.map(s => s.chgPct)))?.name}
-              </p>
-              <p className="text-sm font-bold text-green-600">
-                {formatPercent(sectors.find(s => s.chgPct === Math.max(...sectors.map(s => s.chgPct)))?.chgPct)}
-              </p>
-            </div>
-          )}
+          {(() => {
+            const topGainer = sectors.find(s => s.chgPct === Math.max(...sectors.map(s => s.chgPct)));
+            return topGainer ? (
+              <div className="bg-green-50 rounded p-2">
+                <p className="text-xs font-medium text-gray-700">
+                  {topGainer.name}
+                </p>
+                <p className="text-sm font-bold text-green-600">
+                  {formatPercent(topGainer.chgPct)}
+                </p>
+              </div>
+            ) : null;
+          })()}
         </div>
         <div>
           <p className="text-xs font-medium text-red-700 mb-2">Top Loser</p>
-          {sectors.find(s => s.chgPct === Math.min(...sectors.map(s => s.chgPct))) && (
-            <div className="bg-red-50 rounded p-2">
-              <p className="text-xs font-medium text-gray-700">
-                {sectors.find(s => s.chgPct === Math.min(...sectors.map(s => s.chgPct)))?.name}
-              </p>
-              <p className="text-sm font-bold text-red-600">
-                {formatPercent(sectors.find(s => s.chgPct === Math.min(...sectors.map(s => s.chgPct)))?.chgPct)}
-              </p>
-            </div>
-          )}
+          {(() => {
+            const topLoser = sectors.find(s => s.chgPct === Math.min(...sectors.map(s => s.chgPct)));
+            return topLoser ? (
+              <div className="bg-red-50 rounded p-2">
+                <p className="text-xs font-medium text-gray-700">
+                  {topLoser.name}
+                </p>
+                <p className="text-sm font-bold text-red-600">
+                  {formatPercent(topLoser.chgPct)}
+                </p>
+              </div>
+            ) : null;
+          })()}
         </div>
       </div>
     </div>
