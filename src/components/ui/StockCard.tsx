@@ -7,7 +7,14 @@ interface StockCardProps {
   volume?: number;
 }
 
-export default function StockCard({ symbol, name, price, change, changePercent, volume }: StockCardProps) {
+export default function StockCard({
+  symbol,
+  name,
+  price,
+  change,
+  changePercent,
+  volume,
+}: StockCardProps) {
   const isPositive = change >= 0;
 
   return (
@@ -21,8 +28,12 @@ export default function StockCard({ symbol, name, price, change, changePercent, 
           <p className="text-lg font-semibold text-gray-900">
             ฿{price.toFixed(2)}
           </p>
-          <p className={`text-sm font-medium ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
-            {isPositive ? '+' : ''}{change.toFixed(2)} ({isPositive ? '+' : ''}{changePercent.toFixed(2)}%)
+          <p
+            className={`text-sm font-medium ${isPositive ? "text-green-600" : "text-red-600"}`}
+          >
+            {isPositive ? "+" : ""}
+            {change} ({isPositive ? "+" : ""}
+            {changePercent.toFixed(2)}%)
           </p>
         </div>
       </div>

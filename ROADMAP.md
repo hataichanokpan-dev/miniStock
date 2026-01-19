@@ -8,9 +8,9 @@
 
 ---
 
-## Current Status: Phase 1 Complete ✅
+## Current Status: Phase 1 Complete ✅ | Phase 2 In Progress 🚧
 
-### Completed
+### Completed (Phase 1) ✅
 - [x] Next.js 15 project with App Router
 - [x] TypeScript configuration
 - [x] TailwindCSS design system
@@ -18,16 +18,31 @@
 - [x] Core UI components (Header, Sidebar, Cards)
 - [x] Type definitions for stocks, portfolio, watchlist
 - [x] Responsive dashboard layout
-
-### Completed ✅
-- [x] Real-time stock data integration
+- [x] Real-time stock data integration (Yahoo Finance - no API key)
 - [x] Financial metrics display
 - [x] Data models and types
 - [x] API routes
 - [x] Caching layer
+- [x] **SETTRADE Integration via Firebase**
+  - Industry sector data (Thai market)
+  - Investor type flow data
+  - Mobile responsive design
+- [x] **Design System**
+  - DESIGN_RULES.md with Thai market conventions
+  - Format utilities (@/lib/format.ts)
+  - Mobile-first responsive components
+- [x] **Market Page Features**
+  - Sector Flow Dashboard (money in/out, value distribution, leaders/laggards)
+  - Investor Flow Card (Key Driver identification, buy/sell/net analysis)
+  - Mobile responsive tab navigation
+- [x] **Stock Page** (basic)
+  - Stock detail page: `/stocks/[symbol]`
+  - Yahoo Finance data integration
 
-### In Progress
-- [ ] User authentication
+### In Progress (Phase 2) 🚧
+- [ ] CAN SLIM Analysis System
+- [ ] SPEA Analysis System
+- [ ] Additional analysis systems (value, growth, quality metrics)
 
 ---
 
@@ -642,6 +657,109 @@ interface AnnualData {
 
 ---
 
+## Investor Wishlist: What I Want to See Next 🎯
+
+_As a retail investor focused on Thai stocks (SET), here's what I need most:_
+
+### 1. Individual Stock Analysis Page 📊
+**Priority: HIGHEST**
+```
+For any stock (e.g., PTT, AOT, KBANK):
+- Price chart with moving averages (MA50, MA200)
+- Key fundamentals at a glance (P/E, P/BV, ROE, Dividend Yield)
+- Valuation: Is it cheap or expensive? (vs historical average, vs sector)
+- Financial health check (debt ratio, current ratio)
+- Recent news & events
+- Compare to peers in same sector
+```
+
+### 2. Valuation Tools 💰
+**Priority: HIGH**
+```
+Quick question: "Is this stock fairly priced?"
+- Intrinsic value calculator (DCF, Graham Number)
+- P/E vs historical (5-year range)
+- P/BV vs historical
+- Overvalued/Fair/Undervalued indicator
+```
+
+### 3. Price Alerts 🔔
+**Priority: HIGH**
+```
+Don't miss opportunities:
+- Set target price: "Alert me when PTT < ฿30"
+- Set % change: "Alert me when my watchlist drops 5%"
+- Email or LINE notifications
+```
+
+### 4. Market Sentiment Indicators 📈
+**Priority: MEDIUM**
+```
+- Are investors bullish or bearish today?
+- Foreign investor flow trend (7-day, 30-day)
+- Sector rotation analysis (money moving where?)
+- Top 10 most active stocks
+```
+
+### 5. Simple Scoring System ⭐
+**Priority: MEDIUM**
+```
+Quick stock assessment (0-100 score):
+- Fundamental score (based on earnings, growth, financial health)
+- Valuation score (cheap vs expensive)
+- Technical score (trend, momentum)
+- Overall: "Buy/Hold/Sell" recommendation
+```
+
+### 6. Watchlist & Portfolio 👀
+**Priority: MEDIUM**
+```
+- Save stocks I'm interested in
+- Track my holdings
+- See daily P&L
+- Add notes: "Why I bought this"
+```
+
+### 7. Sector Overview 🏭
+**Priority: LOW**
+```
+- Which sectors are hot today?
+- Compare sectors: Which is best value?
+- Sector rotation: Where is money moving?
+```
+
+---
+
+## Recommended Implementation Order (Investor Priority)
+
+### Sprint 1 (Week 1-2): Stock Detail Page ✅
+- [ ] Price chart with MA50/MA200
+- [ ] Key fundamentals display
+- [ ] Peer comparison (same sector)
+- [ ] Historical P/E, P/BV chart
+
+### Sprint 2 (Week 3-4): Valuation Tools
+- [ ] Intrinsic value calculator
+- [ ] Overvalued/Fair/Undervalued indicator
+- [ ] DCF model (simplified)
+
+### Sprint 3 (Week 5-6): Alerts & Notifications
+- [ ] Price alert system
+- [ ] Email notifications
+- [ ] Alert center UI
+
+### Sprint 4 (Week 7-8): Scoring System
+- [ ] Simplified CAN SLIM (Thai market adapted)
+- [ ] Fundamental score calculator
+- [ ] Overall rating (Buy/Hold/Sell)
+
+### Sprint 5 (Week 9+): Portfolio & Watchlist
+- [ ] Watchlist CRUD
+- [ ] Portfolio tracking
+- [ ] Performance charts
+
+---
+
 **Last Updated:** January 2026
-**Version:** 1.1
-**Status:** Phase 1 Complete ✅ - Ready for Phase 2
+**Version:** 1.2
+**Status:** Phase 1 Complete ✅ | Phase 2 In Progress 🚧

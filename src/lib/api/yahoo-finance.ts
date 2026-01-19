@@ -4,11 +4,19 @@
  * Using yahoo-finance2 library for data fetching
  */
 
-import yahooFinance from 'yahoo-finance2';
+import YahooFinance from 'yahoo-finance2';
 import type { Quote } from '@/types/market';
 import type { FinancialMetrics } from '@/types/financials';
 import type { IncomeStatement, BalanceSheet, CashFlowStatement } from '@/types/financials';
 import { withCache, CACHE_TTL } from './cache';
+
+// Initialize Yahoo Finance instance with configuration
+const yahooFinance = new YahooFinance({
+  suppressNotices: ['yahooSurvey', 'ripHistorical'],
+  validation: {
+    logErrors: false, // Disable verbose validation logging
+  }
+});
 
 /**
  * Fetch financial statements from Yahoo Finance
@@ -266,6 +274,7 @@ export async function getCompanyProfileYahoo(symbol: string): Promise<{
 
 /**
  * Fetch historical price data from Yahoo Finance
+ * Using chart() instead of historical() as recommended by yahoo-finance2 v3
  */
 export async function getHistoricalPricesYahoo(
   symbol: string,
@@ -281,20 +290,29 @@ export async function getHistoricalPricesYahoo(
   const cacheKey = 'yahoo:historical:' + symbol + ':' + period;
 
   return withCache(cacheKey, CACHE_TTL.HISTORICAL, async () => {
-    const result = await yahooFinance.historical(symbol, {
-      period1: getStartDate(period),
-      period2: new Date(),
-      interval: getInterval(period),
-    }) as any[];
+    try {
+      const result = await yahooFinance.chart(symbol, {
+        period1: getStartDate(period),
+        period2: new Date(),
+        interval: getInterval(period),
+      });
 
-    return result.map((item) => ({
-      date: item.date.toISOString().split('T')[0],
-      open: item.open,
-      high: item.high,
-      low: item.low,
-      close: item.close,
-      volume: item.volume,
-    }));
+      if (!result || !result.quotes || result.quotes.length === 0) {
+        return [];
+      }
+
+      return result.quotes.map((item: any) => ({
+        date: item.date.toISOString().split('T')[0],
+        open: item.open || 0,
+        high: item.high || 0,
+        low: item.low || 0,
+        close: item.close || 0,
+        volume: item.volume || 0,
+      }));
+    } catch (error) {
+      console.warn(`Historical price data not available for ${symbol}:`, (error as Error).message);
+      return [];
+    }
   });
 }
 

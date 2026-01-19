@@ -20,53 +20,95 @@ miniStock empowers retail investors, swing traders, and value investors with ins
 | **Styling** | TailwindCSS |
 | **Backend** | Firebase (Authentication & Realtime Database) |
 | **Animations** | Framer Motion |
-| **Data APIs** | Alpha Vantage, Financial Modeling Prep, Finnhub |
+| **Data APIs** | Yahoo Finance (Primary - FREE), SETTRADE (via Firebase) |
 
 ## Project Status
 
-### MVP Foundation (Complete)
-- Next.js 15 project with App Router
-- TypeScript configuration
-- TailwindCSS design system
-- Firebase configuration
-- Core UI components (Header, Sidebar, Cards)
-- Type definitions for stocks, portfolio, watchlist
-- Responsive dashboard layout
-- API routes for stock data and market information
+### Phase 1: Data Layer Foundation ✅ COMPLETE
+- ✅ Yahoo Finance API v3 integration (no API key required)
+- ✅ Real-time stock quotes and historical data
+- ✅ Market indices data (US & Thailand)
+- ✅ SETTRADE Thailand market data integration
+- ✅ Firebase Realtime Database setup
+- ✅ Core UI components (Header, Sidebar, Cards)
+- ✅ Dashboard with live market data
+- ✅ API routes for all endpoints
 
-### In Progress
-- Real-time stock data integration
-- User authentication
-- Financial metrics display
+### Phase 2: Analysis Systems (In Progress)
+- 📋 CAN SLIM scoring system
+- 📋 SPEA framework implementation
+- 📋 Analysis score display components
+
+### Phase 3: User Features (Planned)
+- 📋 User authentication (Firebase Auth)
+- 📋 Watchlist management
+- 📋 Portfolio tracking
 
 ## Project Structure
 
 ```
 miniStock/
 ├── src/
-│   ├── app/                    # Next.js App Router pages
-│   │   ├── api/               # API routes
-│   │   │   ├── market/        # Market indices & scanner
-│   │   │   └── stock/[symbol]/# Stock data endpoints
-│   │   ├── layout.tsx         # Root layout
-│   │   └── page.tsx           # Dashboard page
+│   ├── app/                          # Next.js App Router pages
+│   │   ├── api/                     # API routes
+│   │   │   ├── market/              # Market indices & scanner
+│   │   │   ├── settrade/            # ✅ SETTRADE data endpoints
+│   │   │   │   ├── industry-sector/
+│   │   │   │   └── investor-type/
+│   │   │   └── stock/[symbol]/      # Stock data endpoints
+│   │   ├── layout.tsx               # Root layout
+│   │   ├── page.tsx                 # ✅ Dashboard page
+│   │   ├── market/                  # ✅ Market overview page
+│   │   └── stocks/                  # Stock listing & detail pages
 │   ├── components/
-│   │   ├── layout/            # Layout components (Header, Sidebar)
-│   │   └── ui/                # Reusable UI components
+│   │   ├── layout/                  # Layout components (Header, Sidebar)
+│   │   ├── ui/                      # Reusable UI components
+│   │   ├── settrade/                # ✅ SETTRADE components
+│   │   │   ├── IndustrySectorCard.tsx
+│   │   │   └── InvestorTypeCard.tsx
+│   │   ├── charts/                  # Chart components
+│   │   └── analysis/                # 📋 Analysis components (Phase 2)
 │   ├── lib/
-│   │   ├── api/               # Data layer (quotes, fundamentals, cache)
-│   │   ├── firebase.ts        # Firebase config
-│   │   └── types.ts           # Shared types
-│   └── types/                 # TypeScript type definitions
-│       ├── analysis.ts        # Analysis scoring types
-│       ├── financials.ts      # Financial statement types
-│       └── market.ts          # Market data types
-├── public/                    # Static assets
-├── ROADMAP.md                 # Detailed project roadmap
+│   │   ├── api/                     # Data layer
+│   │   │   ├── yahoo-finance.ts     # ✅ Yahoo Finance integration
+│   │   │   ├── quotes.ts            # Quote fetching
+│   │   │   ├── fundamentals.ts      # Fundamental data
+│   │   │   ├── statements.ts        # Financial statements
+│   │   │   ├── cache.ts             # Caching layer
+│   │   │   └── stock-api.ts         # API validation
+│   │   ├── firebase/                # ✅ Firebase services
+│   │   │   └── settrade.ts          # SETTRADE data service
+│   │   ├── firebase.ts              # Firebase config
+│   │   └── types.ts                 # Shared types
+│   └── types/                       # TypeScript type definitions
+│       ├── analysis.ts              # 📋 Analysis scoring types
+│       ├── financials.ts            # Financial statement types
+│       ├── market.ts                # Market data types
+│       └── settrade.ts              # ✅ SETTRADE types
+├── public/                          # Static assets
+├── DESIGN_RULES.md                  # ✅ Design system guidelines
+├── PROJECT_STATUS.md                # ✅ Current project status
+├── IMPLEMENTATION_GUIDE.md          # 📋 Implementation guide
+├── ROADMAP.md                       # Detailed project roadmap
 └── package.json
 ```
 
 ## Key Features
+
+### Thailand Market Data ✅
+- **Industry Sector Performance Tracking**
+  - Real-time sector performance (Energy, Banking, Technology, etc.)
+  - Top gaining and losing sectors
+  - Trading volume and value per sector
+- **Investor Type Analysis**
+  - 🌍 Foreign investors buy/sell flow
+  - 👤 Local Individual investors
+  - 🏢 Local Institutions
+  - 📊 Proprietary Trading
+  - Net flow visualization with buy/sell ratios
+- **Market Breadth Indicators**
+  - Advancing vs declining stocks
+  - Total trading volume and value
 
 ### Analysis Systems
 - **CAN SLIM Analysis:** Growth stock evaluation based on William O'Neil's methodology
@@ -85,13 +127,15 @@ miniStock/
 - **Quality Metrics:** Margin trends, FCF conversion, Capital allocation
 
 ### Core Features
-- Real-time stock quotes and price charts
-- Financial statements (Income Statement, Balance Sheet, Cash Flow)
-- Watchlist with custom notes and price alerts
-- Portfolio management with performance analytics
-- Stock screener with advanced filters
-- Multi-stock comparison tool (up to 4 stocks)
-- Market dashboard with sector analysis
+- ✅ Real-time stock quotes (US & Thailand markets)
+- ✅ Market indices tracking (S&P 500, SET, NASDAQ, etc.)
+- ✅ Top gainers and losers
+- ✅ Historical price data with charts
+- ✅ Company profiles and fundamentals
+- 📋 Watchlist with custom notes and price alerts
+- 📋 Portfolio management with performance analytics
+- 📋 Stock screener with advanced filters
+- 📋 Multi-stock comparison tool (up to 4 stocks)
 
 ### Advanced Features (Planned)
 - Portfolio risk metrics (Alpha, Beta, Sharpe ratio, Sortino ratio)
@@ -213,11 +257,15 @@ See [ROADMAP.md](./ROADMAP.md) for detailed planning.
 
 ## API Cost Comparison
 
-| Provider | Free Tier | Paid Tier | Recommendation |
-|----------|-----------|-----------|----------------|
-| Alpha Vantage | 25 requests/day | $50-150/month | Good for MVP |
-| Financial Modeling Prep | 250 requests/day | $12-79/month | Best value |
-| Finnhub | 60 requests/min | $60-200/month | Good for real-time |
+| Provider | Free Tier | Status |
+|----------|-----------|--------|
+| **Yahoo Finance** | **Unlimited (No API key)** | ✅ **Active (Primary)** |
+| SETTRADE | Via Firebase | ✅ Active (Thai market) |
+| Alpha Vantage | 25 requests/day | Backup option |
+| Financial Modeling Prep | 250 requests/day | Backup option |
+| Finnhub | 60 requests/min | Backup option |
+
+> **Note:** Yahoo Finance requires no API key and works excellently for US stocks. Thai stocks have limited data on Yahoo Finance, so SETTRADE via Firebase is used for Thailand market data.
 
 ## Contributing
 
@@ -237,9 +285,10 @@ This project is licensed under the MIT License.
 
 - CAN SLIM methodology inspired by William O'Neil's Investor's Business Daily
 - Built with [Next.js](https://nextjs.org/)
-- Data providers: Alpha Vantage, Financial Modeling Prep, Finnhub
+- Data providers: Yahoo Finance, SETTRADE
 
 ---
 
-**Version:** 0.1.0
-**Status:** Foundation Complete - Ready for Phase 1
+**Version:** 0.2.0
+**Status:** Phase 1 Complete ✅ - Yahoo Finance + SETTRADE Integration Working
+**Last Updated:** January 19, 2026

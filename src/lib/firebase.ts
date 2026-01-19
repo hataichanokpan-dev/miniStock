@@ -12,12 +12,34 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-// Initialize Firebase
+/**
+ * Validate Firebase config before initialization
+ */
+function validateFirebaseConfig() {
+  if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
+    throw new Error(
+      'Firebase configuration is missing. Please check your environment variables:\n' +
+      '- NEXT_PUBLIC_FIREBASE_API_KEY\n' +
+      '- NEXT_PUBLIC_FIREBASE_PROJECT_ID\n' +
+      '- NEXT_PUBLIC_FIREBASE_DATABASE_URL (required for Realtime Database)'
+    );
+  }
+}
+
+/**
+ * Initialize Firebase (supports both client and server-side)
+ */
+validateFirebaseConfig();
+
 let app: FirebaseApp;
-if (typeof window !== 'undefined' && !getApps().length) {
-  app = initializeApp(firebaseConfig);
+const existingApps = getApps();
+
+if (existingApps.length > 0) {
+  // Use existing app
+  app = existingApps[0] as FirebaseApp;
 } else {
-  app = getApps()[0] as FirebaseApp;
+  // Initialize new app
+  app = initializeApp(firebaseConfig);
 }
 
 export const db: Database = getDatabase(app);
@@ -28,4 +50,7 @@ export const DB_PATHS = {
   WATCHLIST: 'watchlist',
   PORTFOLIO: 'portfolio',
   USER_PREFERENCES: 'userPreferences',
+  SETTRADE: 'settrade',
+  SETTRADE_INDUSTRY_SECTOR: 'settrade/industrySector',
+  SETTRADE_INVESTOR_TYPE: 'settrade/investorType',
 } as const;

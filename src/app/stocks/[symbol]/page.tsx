@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { ArrowLeft } from 'lucide-react';
 import type { Quote } from '@/types/market';
 import type { FinancialMetrics } from '@/types/financials';
 import Card from '@/components/ui/Card';
 import StatusBadge from '@/components/ui/StatusBadge';
-import { LineChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { LineChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
+import { formatPercent, formatTradingValueMn, getChangeColor } from '@/lib/format';
 
 const DATA_FRESHNESS_THRESHOLD = {
   FRESH: 5 * 60 * 1000,
@@ -30,52 +32,47 @@ function getDataStatus(timestamp: number): DataStatus {
 }
 
 function formatTimestamp(timestamp: number): string {
-  return new Date(timestamp).toLocaleString();
-}
-
-function formatNumber(num: number): string {
-  if (num >= 1e9) return (num / 1e9).toFixed(2) + 'B';
-  if (num >= 1e6) return (num / 1e6).toFixed(2) + 'M';
-  if (num >= 1e3) return (num / 1e3).toFixed(2) + 'K';
-  return num.toFixed(2);
-}
-
-function formatPercent(num: number): string {
-  return (num >= 0 ? '+' : '') + num.toFixed(2) + '%';
+  return new Date(timestamp).toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 const METRIC_EXPLANATIONS = {
   revenueGrowth: {
     title: 'Revenue Growth',
-    explanation: 'Higher revenue growth indicates increasing sales. Compare to industry norms and check consistency.',
+    explanation: 'Higher revenue growth indicates increasing sales. Compare to industry norms.',
   },
   epsGrowth: {
     title: 'EPS Growth',
-    explanation: 'Earnings per share growth shows profitability improvement. Look for consistent positive growth over time.',
+    explanation: 'Earnings per share growth shows profitability improvement. Look for consistency.',
   },
   roe: {
-    title: 'Return on Equity (ROE)',
-    explanation: 'Higher ROE can indicate efficient capital use. Extremely high values may warrant checking leverage levels.',
+    title: 'Return on Equity',
+    explanation: 'Higher ROE can indicate efficient capital use. Check leverage levels.',
   },
   profitMargin: {
     title: 'Profit Margin',
-    explanation: 'Shows how much profit is made per dollar of revenue. Higher margins suggest competitive advantages.',
+    explanation: 'Shows profit per dollar of revenue. Higher margins suggest competitive advantages.',
   },
   deRatio: {
-    title: 'Debt-to-Equity Ratio',
-    explanation: 'Higher leverage amplifies both returns and risks. Compare to industry averages for context.',
+    title: 'Debt-to-Equity',
+    explanation: 'Higher leverage amplifies returns and risks. Compare to industry averages.',
   },
   peRatio: {
     title: 'P/E Ratio',
-    explanation: 'Price relative to earnings. Lower P/E may indicate value, or growth concerns. Higher P/E suggests growth expectations.',
+    explanation: 'Price relative to earnings. Lower P/E may indicate value.',
   },
   pbRatio: {
     title: 'P/B Ratio',
-    explanation: 'Price relative to book value. P/B under 1 may indicate undervaluation, but check asset quality.',
+    explanation: 'Price relative to book value. P/B under 1 may indicate undervaluation.',
   },
   dividendYield: {
     title: 'Dividend Yield',
-    explanation: 'Annual dividends as percentage of stock price. High yields can be attractive but verify sustainability.',
+    explanation: 'Annual dividends as percentage of stock price. Verify sustainability.',
   },
 };
 
@@ -87,33 +84,44 @@ interface MetricCardProps {
 }
 
 function MetricCard({ title, value, explanation, status = 'neutral' }: MetricCardProps) {
+  const statusColors = {
+    success: 'text-green-600',
+    warning: 'text-yellow-600',
+    danger: 'text-red-600',
+    neutral: 'text-gray-600',
+  };
+
   return (
-    <div className='p-4 bg-gray-50 rounded-lg border border-gray-100'>
-      <div className='flex items-start justify-between mb-2'>
-        <h4 className='text-sm font-medium text-gray-700'>{title}</h4>
-        {status !== 'neutral' && <StatusBadge status={status}>{status === 'success' ? 'Good' : status === 'warning' ? 'Check' : 'Caution'}</StatusBadge>}
+    <div className="p-3 bg-white rounded-lg border border-gray-100 hover:border-gray-200 transition-colors">
+      <div className="flex items-start justify-between mb-2">
+        <h4 className="text-xs font-medium text-gray-700">{title}</h4>
+        {status !== 'neutral' && (
+          <StatusBadge status={status}>
+            {status === 'success' ? 'Good' : status === 'warning' ? 'Check' : 'Caution'}
+          </StatusBadge>
+        )}
       </div>
-      <p className='text-xl font-semibold text-gray-900 mb-1'>{value ?? '—'}</p>
-      <p className='text-xs text-gray-500 leading-relaxed'>{explanation}</p>
+      <p className={`text-lg font-bold ${statusColors[status]} mb-1`}>{value ?? '—'}</p>
+      <p className="text-xs text-gray-500 leading-snug">{explanation}</p>
     </div>
   );
 }
 
 function getActionableErrorMessage(error: ApiError): string {
   if (error.details?.includes('Missing NEXT_PUBLIC_STOCK_API_KEY')) {
-    return 'API configuration error: Stock data provider requires an API key. Please check server environment variables.';
+    return 'API configuration error: Stock data provider requires an API key.';
   }
   if (error.details?.includes('API key not configured')) {
-    return 'API key not configured. Please set NEXT_PUBLIC_STOCK_API_KEY environment variable.';
+    return 'API key not configured. Please set environment variables.';
   }
   if (error.provider) {
-    return `Stock API error using ${error.provider.toUpperCase()} provider: ${error.details || error.error}`;
+    return `Stock API error using ${error.provider.toUpperCase()} provider.`;
   }
   if (error.status === 404) {
     return `Stock symbol not found or data unavailable.`;
   }
   if (error.status === 500) {
-    return `Server error: ${error.details || 'Unable to fetch stock data. Please try again later.'}`;
+    return `Server error: Unable to fetch stock data. Please try again later.`;
   }
   return error.details || error.error || 'Failed to load stock data';
 }
@@ -150,7 +158,6 @@ export default function StockDetailPage() {
           historicalRes.json(),
         ]);
 
-        // Check for API errors
         if (!quoteRes.ok) {
           throw new Error(JSON.stringify({ ...quoteData, status: quoteRes.status }));
         }
@@ -168,7 +175,11 @@ export default function StockDetailPage() {
         setQuote(quoteData);
         setMetrics(fundamentalsData.metrics);
         setProfile(fundamentalsData.profile);
-        setHistoricalData((historicalData.data || []).map((h: any) => ({ date: h.date, close: h.close })));
+
+        // Only set historical data if we have valid data points
+        const historical = historicalData.data || [];
+        const validHistorical = historical.filter((h: any) => h.date && h.close != null);
+        setHistoricalData(validHistorical.map((h: any) => ({ date: h.date, close: h.close })));
       } catch (err) {
         if (err instanceof Error) {
           try {
@@ -189,14 +200,37 @@ export default function StockDetailPage() {
 
   if (loading) {
     return (
-      <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
-        <div className='animate-pulse space-y-6'>
-          <div className='h-8 bg-gray-200 rounded w-1/3'></div>
-          <div className='h-64 bg-gray-200 rounded'></div>
-          <div className='grid grid-cols-1 md:grid-cols-3 gap-6'>
-            <div className='h-48 bg-gray-200 rounded'></div>
-            <div className='h-48 bg-gray-200 rounded'></div>
-            <div className='h-48 bg-gray-200 rounded'></div>
+      <div className="min-h-screen bg-gray-50">
+        {/* Header */}
+        <div className="bg-[#1e3a5f] text-white py-4">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => router.push('/stocks')}
+                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                aria-label="Back to stocks"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+              <div>
+                <h1 className="text-xl font-bold">{symbol || 'Loading...'}</h1>
+                <p className="text-sm text-white/70">Stock Analysis</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Loading skeleton */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="animate-pulse space-y-4">
+            <div className="h-8 bg-gray-200 rounded w-1/4"></div>
+            <div className="h-64 bg-gray-200 rounded"></div>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="h-32 bg-gray-200 rounded"></div>
+              <div className="h-32 bg-gray-200 rounded"></div>
+              <div className="h-32 bg-gray-200 rounded"></div>
+              <div className="h-32 bg-gray-200 rounded"></div>
+            </div>
           </div>
         </div>
       </div>
@@ -206,174 +240,407 @@ export default function StockDetailPage() {
   if (error) {
     const errorMessage = getActionableErrorMessage(error);
     return (
-      <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
-        <Card>
-          <div className='text-center py-12'>
-            <h2 className='text-xl font-semibold text-gray-900 mb-2'>Error Loading Stock Data</h2>
-            <p className='text-gray-600 mb-2'>{symbol}</p>
-            <div className='max-w-lg mx-auto mb-6 p-4 bg-red-50 border border-red-200 rounded-lg'>
-              <p className='text-sm text-red-800'>{errorMessage}</p>
-              {error.provider && (
-                <p className='text-xs text-red-600 mt-2'>Provider: {error.provider.toUpperCase()}</p>
-              )}
+      <div className="min-h-screen bg-gray-50">
+        {/* Header */}
+        <div className="bg-[#1e3a5f] text-white py-4">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => router.push('/stocks')}
+                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                aria-label="Back to stocks"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+              <div>
+                <h1 className="text-xl font-bold">{symbol}</h1>
+                <p className="text-sm text-white/70">Error</p>
+              </div>
             </div>
-            <button onClick={() => router.push('/stocks')} className='btn btn-secondary'>
-              Back to Stocks
+          </div>
+        </div>
+
+        <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="bg-white rounded-lg shadow-sm p-8 text-center">
+            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <span className="text-3xl">⚠️</span>
+            </div>
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">Unable to Load Stock</h2>
+            <p className="text-gray-600 mb-6">{symbol}</p>
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+              <p className="text-sm text-red-800">{errorMessage}</p>
+            </div>
+            <button
+              onClick={() => router.push('/stocks')}
+              className="px-6 py-2.5 bg-[#1e3a5f] text-white font-medium rounded-lg hover:bg-[#2a4a6f] transition-colors"
+            >
+              Back to Stock Search
             </button>
           </div>
-        </Card>
+        </div>
       </div>
     );
   }
 
   if (!quote) {
     return (
-      <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
-        <Card>
-          <div className='text-center py-12'>
-            <h2 className='text-xl font-semibold text-gray-900 mb-2'>Stock Not Found</h2>
-            <p className='text-gray-600 mb-6'>No data available for symbol: {symbol}</p>
-            <button onClick={() => router.push('/stocks')} className='btn btn-secondary'>
-              Back to Stocks
+      <div className="min-h-screen bg-gray-50">
+        {/* Header */}
+        <div className="bg-[#1e3a5f] text-white py-4">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => router.push('/stocks')}
+                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                aria-label="Back to stocks"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+              <div>
+                <h1 className="text-xl font-bold">{symbol}</h1>
+                <p className="text-sm text-white/70">Not Found</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="bg-white rounded-lg shadow-sm p-8 text-center">
+            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <span className="text-3xl">📊</span>
+            </div>
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">Stock Not Found</h2>
+            <p className="text-gray-600 mb-6">
+              No data available for symbol: <span className="font-mono font-semibold">{symbol}</span>
+            </p>
+            <button
+              onClick={() => router.push('/stocks')}
+              className="px-6 py-2.5 bg-[#1e3a5f] text-white font-medium rounded-lg hover:bg-[#2a4a6f] transition-colors"
+            >
+              Back to Stock Search
             </button>
           </div>
-        </Card>
+        </div>
       </div>
     );
   }
 
   const dataStatus = getDataStatus(quote.timestamp);
   const statusConfig = {
-    fresh: { label: 'Live', status: 'success' as const },
-    delayed: { label: 'Delayed', status: 'warning' as const },
-    stale: { label: 'Stale', status: 'danger' as const },
+    fresh: { label: 'Live', status: 'success' as const, color: 'text-green-600' },
+    delayed: { label: 'Delayed', status: 'warning' as const, color: 'text-yellow-600' },
+    stale: { label: 'Stale', status: 'danger' as const, color: 'text-red-600' },
   };
 
+  // Check if we have enough historical data for the chart
+  const hasValidChartData = historicalData.length >= 2;
+
   return (
-    <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
-      <div className='mb-6'>
-        <div className='flex items-center gap-3 mb-2'>
-          <h1 className='text-3xl font-bold text-gray-900'>{symbol}</h1>
-          <StatusBadge status={statusConfig[dataStatus].status}>
-            {statusConfig[dataStatus].label}
-          </StatusBadge>
+    <div className="min-h-screen bg-gray-50">
+      {/* Professional Header */}
+      <div className="bg-[#1e3a5f] text-white py-4 sm:py-6">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => router.push('/stocks')}
+                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                aria-label="Back to stock search"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-bold">{symbol}</h1>
+                {profile?.name && (
+                  <p className="text-sm sm:text-base text-white/80">{profile.name}</p>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <StatusBadge status={statusConfig[dataStatus].status}>
+                {statusConfig[dataStatus].label}
+              </StatusBadge>
+              <button
+                onClick={() => window.location.reload()}
+                className="px-3 py-1.5 text-xs sm:text-sm font-medium bg-white/10 hover:bg-white/20 rounded border border-white/20 transition-colors"
+              >
+                Refresh
+              </button>
+            </div>
+          </div>
         </div>
-        {profile?.name && <p className='text-lg text-gray-600'>{profile.name}</p>}
-        <p className='text-sm text-gray-500 mt-1'>
-          Last updated: {formatTimestamp(quote.timestamp)}
-        </p>
       </div>
 
-      <div className='grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6'>
-        <div className='lg:col-span-2'>
-          <Card title='Price Chart'>
-            {historicalData.length > 0 ? (
-              <ResponsiveContainer width='100%' height={300}>
-                <LineChart data={historicalData.slice(-90)}>
-                  <XAxis dataKey='date' tickFormatter={(v) => new Date(v).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} />
-                  <YAxis tickFormatter={(v) => v.toFixed(0)} />
-                  <Tooltip labelFormatter={(v) => new Date(v).toLocaleDateString()} formatter={(value) => typeof value === 'number' ? ['$' + value.toFixed(2), 'Price'] : ['', '']} />
-                  <Line type='monotone' dataKey='close' stroke='#1e3a5f' strokeWidth={2} dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className='h-[300px] flex items-center justify-center text-gray-500'>
-                Chart data unavailable
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+        {/* Quote & Key Stats - Compact */}
+        <div className="mb-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-gray-200">
+              {/* Symbol & Name */}
+              <div className="p-4 sm:p-5">
+                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Symbol</p>
+                <p className="text-xl sm:text-2xl font-bold text-[#1e3a5f]">{symbol}</p>
+                {profile?.sector && (
+                  <p className="text-xs text-gray-500 mt-1">{profile.sector}</p>
+                )}
               </div>
-            )}
-          </Card>
-        </div>
 
-        <div>
-          <Card title='Key Stats'>
-            <div className='space-y-4'>
-              <div>
-                <p className='text-sm text-gray-500'>Current Price</p>
-                <p className='text-3xl font-bold text-gray-900'>${quote.price.toFixed(2)}</p>
+              {/* Current Price */}
+              <div className="p-4 sm:p-5">
+                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Price</p>
+                <div className="flex items-baseline gap-2">
+                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">
+                    ${quote.price.toFixed(2)}
+                  </p>
+                  <div className={`text-lg font-semibold ${getChangeColor(quote.changePercent)}`}>
+                    {quote.change >= 0 ? '+' : ''}{quote.change.toFixed(2)} ({formatPercent(quote.changePercent)})
+                  </div>
+                </div>
               </div>
-              <div>
-                <p className='text-sm text-gray-500'>Change</p>
-                <p className={'text-lg font-semibold ' + (quote.change >= 0 ? 'text-green-600' : 'text-red-600')}>
-                  {quote.change >= 0 ? '+' : ''}{quote.change.toFixed(2)} ({formatPercent(quote.changePercent)})
-                </p>
+
+              {/* Day Range */}
+              <div className="p-4 sm:p-5">
+                <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">Day Range</p>
+                <div className="flex items-center gap-3 text-sm">
+                  <div>
+                    <span className="text-gray-500">High:</span>
+                    <span className="ml-1 font-medium">{quote.high.toFixed(2)}</span>
+                  </div>
+                  <div className="w-px h-4 bg-gray-200"></div>
+                  <div>
+                    <span className="text-gray-500">Low:</span>
+                    <span className="ml-1 font-medium">{quote.low.toFixed(2)}</span>
+                  </div>
+                </div>
               </div>
-              <div className='pt-4 border-t border-gray-200'>
-                <div className='grid grid-cols-2 gap-4 text-sm'>
-                  <div>
-                    <p className='text-gray-500'>Day High</p>
-                    <p className='font-medium'>${quote.high.toFixed(2)}</p>
+
+              {/* Market Cap & Volume */}
+              <div className="p-4 sm:p-5">
+                <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">Market Data</p>
+                <div className="space-y-1">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Market Cap:</span>
+                    <span className="font-medium ml-2">{formatTradingValueMn(quote.marketCap)}</span>
                   </div>
-                  <div>
-                    <p className='text-gray-500'>Day Low</p>
-                    <p className='font-medium'>${quote.low.toFixed(2)}</p>
-                  </div>
-                  <div>
-                    <p className='text-gray-500'>Volume</p>
-                    <p className='font-medium'>{formatNumber(quote.volume)}</p>
-                  </div>
-                  <div>
-                    <p className='text-gray-500'>Market Cap</p>
-                    <p className='font-medium'>{formatNumber(quote.marketCap)}</p>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Volume:</span>
+                    <span className="font-medium ml-2">{formatTradingValueMn(quote.volume)}</span>
                   </div>
                 </div>
               </div>
             </div>
+
+            {/* Meta info */}
+            <div className="px-4 sm:px-5 py-3 bg-gray-50 border-t border-gray-200 flex items-center justify-between text-xs text-gray-500">
+              <span>Data provided by Yahoo Finance</span>
+              <span>{formatTimestamp(quote.timestamp)}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Charts Row */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+          {/* Price Chart */}
+          <div className="lg:col-span-2">
+            <Card title="Price Chart (1 Year)" subtitle={hasValidChartData ? 'Last 90 trading days' : 'Historical data not available'}>
+              {hasValidChartData ? (
+                <div className="h-64 sm:h-80">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={historicalData.slice(-90)}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
+                      <XAxis
+                        dataKey="date"
+                        tickFormatter={(v) => new Date(v).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        tick={{ fontSize: 11, fill: '#6b7280' }}
+                      />
+                      <YAxis
+                        tickFormatter={(v) => v.toFixed(2)}
+                        tick={{ fontSize: 11, fill: '#6b7280' }}
+                        domain={['auto', 'auto']}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: 'rgba(30, 58, 95, 0.95)',
+                          border: '1px solid #e5e7eb',
+                          borderRadius: '4px',
+                        }}
+                        labelFormatter={(v) => new Date(v).toLocaleDateString()}
+                        formatter={(value) => {
+                          if (typeof value === 'number') {
+                            return `$${value.toFixed(2)}`;
+                          }
+                          return '';
+                        }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="close"
+                        stroke="#1e3a5f"
+                        strokeWidth={2}
+                        dot={false}
+                        activeDot={{ r: 4 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <div className="h-64 sm:h-80 flex items-center justify-center bg-gray-50 rounded-lg border border-gray-200">
+                  <div className="text-center">
+                    <span className="text-3xl mb-2">📈</span>
+                    <p className="text-sm text-gray-500">No historical data available</p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Try US stocks (AAPL, MSFT, GOOGL) for best data coverage
+                    </p>
+                  </div>
+                </div>
+              )}
+            </Card>
+          </div>
+
+          {/* Quick Stats */}
+          <div className="space-y-4">
+            {/* Analysis Status */}
+            <Card title="Analysis Status" subtitle="Available analysis tools">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-600">CAN SLIM</span>
+                  <span className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-500">Phase 2</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-600">SPEA</span>
+                  <span className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-500">Phase 2</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-600">Value Metrics</span>
+                  <span className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-500">Phase 2</span>
+                </div>
+              </div>
+            </Card>
+
+            {/* Quick Actions */}
+            <Card title="Quick Actions">
+              <div className="space-y-2">
+                <button
+                  disabled
+                  className="w-full px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-left"
+                >
+                  📋 Add to Watchlist (Coming Soon)
+                </button>
+                <button
+                  disabled
+                  className="w-full px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-left"
+                >
+                  💼 Add to Portfolio (Coming Soon)
+                </button>
+                <button
+                  disabled
+                  className="w-full px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-left"
+                >
+                  📊 Compare (Coming Soon)
+                </button>
+              </div>
+            </Card>
+          </div>
+        </div>
+
+        {/* Financial Metrics */}
+        <Card title="Financial Metrics" subtitle="Key fundamental indicators">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <MetricCard
+              title={METRIC_EXPLANATIONS.revenueGrowth.title}
+              value={metrics?.revenueGrowth !== undefined ? formatPercent(metrics.revenueGrowth) : null}
+              explanation={METRIC_EXPLANATIONS.revenueGrowth.explanation}
+              status={metrics?.revenueGrowth && metrics.revenueGrowth > 0 ? 'success' : metrics?.revenueGrowth && metrics.revenueGrowth < 0 ? 'danger' : 'neutral'}
+            />
+            <MetricCard
+              title={METRIC_EXPLANATIONS.epsGrowth.title}
+              value={metrics?.epsGrowth !== undefined ? formatPercent(metrics.epsGrowth) : null}
+              explanation={METRIC_EXPLANATIONS.epsGrowth.explanation}
+              status={metrics?.epsGrowth && metrics.epsGrowth > 0 ? 'success' : metrics?.epsGrowth && metrics.epsGrowth < 0 ? 'danger' : 'neutral'}
+            />
+            <MetricCard
+              title={METRIC_EXPLANATIONS.roe.title}
+              value={metrics?.roe !== undefined ? metrics.roe.toFixed(2) : null}
+              explanation={METRIC_EXPLANATIONS.roe.explanation}
+              status={metrics?.roe && metrics.roe > 15 ? 'success' : metrics?.roe && metrics.roe < 5 ? 'danger' : 'neutral'}
+            />
+            <MetricCard
+              title={METRIC_EXPLANATIONS.profitMargin.title}
+              value={metrics?.profitMargin !== undefined ? formatPercent(metrics.profitMargin * 100) : null}
+              explanation={METRIC_EXPLANATIONS.profitMargin.explanation}
+              status={metrics?.profitMargin && metrics.profitMargin > 0.1 ? 'success' : metrics?.profitMargin && metrics.profitMargin < 0 ? 'danger' : 'neutral'}
+            />
+            <MetricCard
+              title={METRIC_EXPLANATIONS.deRatio.title}
+              value={metrics?.deRatio !== undefined ? metrics.deRatio.toFixed(2) : null}
+              explanation={METRIC_EXPLANATIONS.deRatio.explanation}
+              status={metrics?.deRatio && metrics.deRatio > 2 ? 'warning' : 'neutral'}
+            />
+            <MetricCard
+              title={METRIC_EXPLANATIONS.peRatio.title}
+              value={metrics?.peRatio !== undefined && metrics.peRatio > 0 ? metrics.peRatio.toFixed(2) : null}
+              explanation={METRIC_EXPLANATIONS.peRatio.explanation}
+              status='neutral'
+            />
+            <MetricCard
+              title={METRIC_EXPLANATIONS.pbRatio.title}
+              value={metrics?.pbRatio !== undefined && metrics.pbRatio > 0 ? metrics.pbRatio.toFixed(2) : null}
+              explanation={METRIC_EXPLANATIONS.pbRatio.explanation}
+              status='neutral'
+            />
+            <MetricCard
+              title={METRIC_EXPLANATIONS.dividendYield.title}
+              value={metrics?.dividendYield !== undefined && metrics.dividendYield > 0 ? formatPercent(metrics.dividendYield * 100) : null}
+              explanation={METRIC_EXPLANATIONS.dividendYield.explanation}
+              status='neutral'
+            />
+          </div>
+        </Card>
+
+        {/* Company Profile (if available) */}
+        {profile?.description && (
+          <Card title="Company Profile" subtitle="Business overview">
+            <p className="text-sm text-gray-700 leading-relaxed max-w-4xl">
+              {profile.description}
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {profile?.website && (
+                <a
+                  href={profile.website}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors text-gray-700"
+                >
+                  Website →
+                </a>
+              )}
+              {profile?.industry && (
+                <span className="text-xs px-3 py-1.5 bg-gray-100 rounded-md text-gray-700">
+                  {profile.industry}
+                </span>
+              )}
+            </div>
           </Card>
+        )}
+
+        {/* Data Source Info */}
+        <div className="bg-blue-50 border border-blue-100 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <span className="text-xl">💡</span>
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-blue-900 mb-1">
+                Data Source Information
+              </p>
+              <p className="text-xs text-blue-800">
+                <strong>US Stocks:</strong> Full data coverage via Yahoo Finance<br />
+                <strong>Thai Stocks (.BK):</strong> Limited fundamental data available on Yahoo Finance<br />
+                <strong>Historical Charts:</strong> Only displayed when sufficient data points are available
+              </p>
+            </div>
+          </div>
         </div>
       </div>
-
-      <Card title='Financial Snapshot' subtitle='Key metrics for quick assessment'>
-        <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'>
-          <MetricCard
-            title={METRIC_EXPLANATIONS.revenueGrowth.title}
-            value={metrics?.revenueGrowth !== undefined ? formatPercent(metrics.revenueGrowth) : null}
-            explanation={METRIC_EXPLANATIONS.revenueGrowth.explanation}
-            status={metrics?.revenueGrowth && metrics.revenueGrowth > 0 ? 'success' : metrics?.revenueGrowth && metrics.revenueGrowth < 0 ? 'danger' : 'neutral'}
-          />
-          <MetricCard
-            title={METRIC_EXPLANATIONS.epsGrowth.title}
-            value={metrics?.epsGrowth !== undefined ? formatPercent(metrics.epsGrowth) : null}
-            explanation={METRIC_EXPLANATIONS.epsGrowth.explanation}
-            status={metrics?.epsGrowth && metrics.epsGrowth > 0 ? 'success' : metrics?.epsGrowth && metrics.epsGrowth < 0 ? 'danger' : 'neutral'}
-          />
-          <MetricCard
-            title={METRIC_EXPLANATIONS.roe.title}
-            value={metrics?.roe !== undefined ? metrics.roe.toFixed(2) : null}
-            explanation={METRIC_EXPLANATIONS.roe.explanation}
-            status={metrics?.roe && metrics.roe > 15 ? 'success' : metrics?.roe && metrics.roe < 5 ? 'danger' : 'neutral'}
-          />
-          <MetricCard
-            title={METRIC_EXPLANATIONS.profitMargin.title}
-            value={metrics?.profitMargin !== undefined ? formatPercent(metrics.profitMargin * 100) : null}
-            explanation={METRIC_EXPLANATIONS.profitMargin.explanation}
-            status={metrics?.profitMargin && metrics.profitMargin > 0.1 ? 'success' : metrics?.profitMargin && metrics.profitMargin < 0 ? 'danger' : 'neutral'}
-          />
-          <MetricCard
-            title={METRIC_EXPLANATIONS.deRatio.title}
-            value={metrics?.deRatio !== undefined ? metrics.deRatio.toFixed(2) : null}
-            explanation={METRIC_EXPLANATIONS.deRatio.explanation}
-            status={metrics?.deRatio && metrics.deRatio > 2 ? 'warning' : 'neutral'}
-          />
-          <MetricCard
-            title={METRIC_EXPLANATIONS.peRatio.title}
-            value={metrics?.peRatio !== undefined && metrics.peRatio > 0 ? metrics.peRatio.toFixed(2) : null}
-            explanation={METRIC_EXPLANATIONS.peRatio.explanation}
-            status='neutral'
-          />
-          <MetricCard
-            title={METRIC_EXPLANATIONS.pbRatio.title}
-            value={metrics?.pbRatio !== undefined && metrics.pbRatio > 0 ? metrics.pbRatio.toFixed(2) : null}
-            explanation={METRIC_EXPLANATIONS.pbRatio.explanation}
-            status='neutral'
-          />
-          <MetricCard
-            title={METRIC_EXPLANATIONS.dividendYield.title}
-            value={metrics?.dividendYield !== undefined && metrics.dividendYield > 0 ? formatPercent(metrics.dividendYield * 100) : null}
-            explanation={METRIC_EXPLANATIONS.dividendYield.explanation}
-            status='neutral'
-          />
-        </div>
-      </Card>
     </div>
   );
 }
