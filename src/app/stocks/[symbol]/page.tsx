@@ -151,7 +151,7 @@ export default function StockDetailPage() {
         const [quoteRes, fundamentalsRes, historicalRes] = await Promise.all([
           fetch('/api/stock/' + symbol + '/quote'),
           fetch('/api/stock/' + symbol + '/fundamentals'),
-          fetch('/api/stock/' + symbol + '/historical?period=1y'),
+          fetch('/api/stock/' + symbol + '/historical?period=2y'),
         ]);
 
         const [quoteData, fundamentalsData, historicalData] = await Promise.all([

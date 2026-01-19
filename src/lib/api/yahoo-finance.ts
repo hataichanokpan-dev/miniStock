@@ -203,34 +203,115 @@ export async function getQuotesYahoo(symbols: string[]): Promise<Quote[]> {
 
 /**
  * Fetch company metrics from Yahoo Finance
+ * Maps Yahoo Finance fields to FinancialMetrics with proper null handling
+ *
+ * Yahoo Finance field mapping:
+ * - financialData module: revenueGrowth, profitMargins, operatingMargins, grossMargins
+ * - defaultKeyStatistics module: debtToEquity, returnOnEquity, interestCoverage
+ * - quote/summaryDetail: trailingPE, priceToBook, dividendYield, marketCap
+ * - earnings trend: for EPS growth calculation
  */
 export async function getCompanyMetricsYahoo(symbol: string): Promise<FinancialMetrics> {
   const cacheKey = 'yahoo:metrics:' + symbol;
 
   return withCache(cacheKey, CACHE_TTL.FUNDAMENTALS, async () => {
-    const [result, keyStats] = await Promise.all([
-      yahooFinance.quote(symbol) as any,
-      yahooFinance.quoteSummary(symbol, { modules: ['defaultKeyStatistics', 'financialData'] }) as any,
-    ]);
+    try {
+      const [result, summary] = await Promise.all([
+        yahooFinance.quote(symbol) as any,
+        yahooFinance.quoteSummary(symbol, {
+          modules: ['defaultKeyStatistics', 'financialData', 'summaryDetail']
+        }) as any,
+      ]);
 
-    const stats = keyStats?.defaultKeyStatistics || {};
-    const financialData = keyStats?.financialData || {};
+      const stats = summary?.defaultKeyStatistics || {};
+      const financialData = summary?.financialData || {};
+      const summaryDetail = summary?.summaryDetail || {};
 
-    return {
-      revenue: financialData.totalRevenue || 0,
-      revenueGrowth: financialData.revenueGrowth || 0,
-      netIncome: financialData.netIncomeToCommon || 0,
-      profitMargin: financialData.profitMargins || 0,
-      peRatio: result.trailingPE || 0,
-      pbRatio: result.priceToBook || 0,
-      roe: result.returnOnEquity || 0,
-      deRatio: stats.debtToEquity || 0,
-      eps: result.epsTrailingTwelveMonths || 0,
-      epsGrowth: stats.earningsQuarterlyGrowth || 0,
-      freeCashFlow: financialData.freeCashflow || 0,
-      dividendYield: result.dividendYield || 0,
-      marketCap: result.marketCap || 0,
-    };
+      // Helper to safely extract numbers, returning null for missing/invalid values
+      const safeNum = (val: any): number | null => {
+        if (val === null || val === undefined || !isFinite(val)) return null;
+        return Number(val);
+      };
+
+      // Revenue growth is already a percentage from Yahoo (e.g., 0.05 = 5%)
+      const revenueGrowth = safeNum(financialData.revenueGrowth);
+
+      // Profit margins from Yahoo are decimals (e.g., 0.25 = 25%)
+      const profitMargin = safeNum(financialData.profitMargins);
+      const operatingMargin = safeNum(financialData.operatingMargins);
+      const grossMargin = safeNum(financialData.grossMargins);
+
+      // ROE from Yahoo is a decimal (e.g., 0.15 = 15%)
+      const roe = safeNum(stats.returnOnEquity);
+
+      // Debt-to-Equity ratio
+      const deRatio = safeNum(stats.debtToEquity);
+
+      // Interest coverage ratio
+      const interestCoverage = safeNum(stats.interestCoverage);
+
+      // P/E ratio - can be negative for unprofitable companies
+      const peRatio = safeNum(result.trailingPE);
+
+      // P/B ratio
+      const pbRatio = safeNum(result.priceToBook);
+
+      // Dividend yield from Yahoo is a decimal (e.g., 0.02 = 2%)
+      const dividendYield = safeNum(summaryDetail.dividendYield);
+
+      // EPS Growth - Yahoo provides earningsQuarterlyGrowth as a decimal
+      // Also try earningsPreview and earningsTrend for more accurate YoY growth
+      let epsGrowth: number | null = safeNum(stats.earningsQuarterlyGrowth);
+
+      // If quarterly growth is not available, try to get from earnings trend
+      if (epsGrowth === null) {
+        const earningsTrend = stats?.earningsTrend;
+        if (earningsTrend?.trend && earningsTrend.trend.length > 0) {
+          // Get the most recent earnings growth estimate
+          epsGrowth = safeNum(earningsTrend.trend[0]?.growth);
+        }
+      }
+
+      return {
+        revenue: safeNum(financialData.totalRevenue),
+        revenueGrowth,
+        netIncome: safeNum(financialData.netIncomeToCommon),
+        profitMargin,
+        grossMargin,
+        operatingMargin,
+        peRatio,
+        pbRatio,
+        roe,
+        deRatio,
+        interestCoverage,
+        eps: safeNum(result.epsTrailingTwelveMonths),
+        epsGrowth,
+        freeCashFlow: safeNum(financialData.freeCashflow),
+        dividendYield,
+        marketCap: safeNum(result.marketCap),
+      };
+    } catch (error) {
+      console.warn(`Company metrics not available for ${symbol}:`, (error as Error).message);
+      // Return all null values if data is unavailable
+      return {
+        revenue: null,
+        revenueGrowth: null,
+        netIncome: null,
+        profitMargin: null,
+        grossMargin: null,
+        operatingMargin: null,
+        peRatio: null,
+        pbRatio: null,
+        roe: null,
+        deRatio: null,
+        interestCoverage: null,
+        eps: null,
+        epsGrowth: null,
+        freeCashFlow: null,
+        dividendYield: null,
+        marketCap: null,
+      };
+    }
   });
 }
 
@@ -275,10 +356,11 @@ export async function getCompanyProfileYahoo(symbol: string): Promise<{
 /**
  * Fetch historical price data from Yahoo Finance
  * Using chart() instead of historical() as recommended by yahoo-finance2 v3
+ * Always fetches 2 years of daily data for sufficient MA200 calculation
  */
 export async function getHistoricalPricesYahoo(
   symbol: string,
-  period: '1d' | '5d' | '1mo' | '3mo' | '6mo' | '1y' | '2y' | '5y' | '10y' | 'ytd' | 'max' = '1y'
+  period: '1d' | '5d' | '1mo' | '3mo' | '6mo' | '1y' | '2y' | '5y' | '10y' | 'ytd' | 'max' = '2y'
 ): Promise<Array<{
   date: string;
   open: number;
@@ -294,21 +376,37 @@ export async function getHistoricalPricesYahoo(
       const result = await yahooFinance.chart(symbol, {
         period1: getStartDate(period),
         period2: new Date(),
-        interval: getInterval(period),
+        interval: '1d', // Always use daily interval for MA200 calculation
       });
 
       if (!result || !result.quotes || result.quotes.length === 0) {
         return [];
       }
 
-      return result.quotes.map((item: any) => ({
-        date: item.date.toISOString().split('T')[0],
-        open: item.open || 0,
-        high: item.high || 0,
-        low: item.low || 0,
-        close: item.close || 0,
-        volume: item.volume || 0,
-      }));
+      // Filter to only valid trading days with close prices
+      // Persist only dates that actually have a price (skip null/empty days)
+      const validQuotes = result.quotes
+        .filter((item: any) => {
+          // Must have date and valid close price
+          return item.date && item.close != null && isFinite(item.close) && item.close > 0;
+        })
+        .map((item: any) => ({
+          date: item.date.toISOString().split('T')[0],
+          open: item.open ?? null,
+          high: item.high ?? null,
+          low: item.low ?? null,
+          close: item.close,
+          volume: item.volume ?? null,
+        }));
+
+      // Deduplicate by date (keep last entry if duplicates exist)
+      const dedupedMap = new Map<string, typeof validQuotes[0]>();
+      for (const quote of validQuotes) {
+        dedupedMap.set(quote.date, quote);
+      }
+
+      // Sort ascending by date
+      return Array.from(dedupedMap.values()).sort((a, b) => a.date.localeCompare(b.date));
     } catch (error) {
       console.warn(`Historical price data not available for ${symbol}:`, (error as Error).message);
       return [];

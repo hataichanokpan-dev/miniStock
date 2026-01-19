@@ -43,13 +43,11 @@ export function calculateGrahamNumber(input: ValueInput): number {
   const { financialMetrics, bookValuePerShare } = input;
 
   const eps = financialMetrics.eps;
-  const bvps = bookValuePerShare || financialMetrics.pbRatio > 0
-    ? financialMetrics.peRatio > 0
-        ? (financialMetrics.eps * financialMetrics.peRatio) / financialMetrics.pbRatio
-        : 0
-    : 0;
+  const bvps = bookValuePerShare ?? (financialMetrics.pbRatio && financialMetrics.peRatio && financialMetrics.eps
+    ? (financialMetrics.eps * financialMetrics.peRatio) / financialMetrics.pbRatio
+    : null);
 
-  if (eps <= 0 || bvps <= 0) return 0;
+  if (!eps || eps <= 0 || !bvps || bvps <= 0) return 0;
 
   const grahamNumber = Math.sqrt(22.5 * eps * bvps);
   return grahamNumber;
@@ -78,7 +76,7 @@ export function calculateIntrinsicValue(input: ValueInput): number {
   const { financialMetrics, annualData } = input;
 
   const freeCashFlow = financialMetrics.freeCashFlow;
-  if (freeCashFlow <= 0) return 0;
+  if (!freeCashFlow || freeCashFlow <= 0) return 0;
 
   // Growth assumptions (conservative)
   const growthRate = 0.05; // 5% growth
@@ -104,9 +102,10 @@ export function calculateIntrinsicValue(input: ValueInput): number {
   presentValue += pvTerminalValue;
 
   // Estimate shares outstanding
+  const peRatio = financialMetrics.peRatio ?? 15;
   const sharesOutstanding =
-    financialMetrics.eps > 0
-      ? financialMetrics.marketCap / (financialMetrics.eps * (financialMetrics.peRatio || 15))
+    financialMetrics.eps && financialMetrics.eps > 0 && financialMetrics.marketCap
+      ? financialMetrics.marketCap / (financialMetrics.eps * peRatio)
       : 0;
 
   if (sharesOutstanding <= 0) return 0;
@@ -134,45 +133,45 @@ export function calculatePiotroskiFScore(input: ValueInput): number {
   // Profitability Signals (4 points)
 
   // F1: Positive net income
-  if (latest.netIncome > 0) score += 1;
+  if (latest.netIncome && latest.netIncome > 0) score += 1;
 
   // F2: Positive cash flow from operations (using free cash flow as proxy)
-  if (financialMetrics.freeCashFlow > 0) score += 1;
+  if (financialMetrics.freeCashFlow && financialMetrics.freeCashFlow > 0) score += 1;
 
   // F3: Increasing net income
-  if (latest.netIncome > previous.netIncome) score += 1;
+  if (latest.netIncome && previous.netIncome && latest.netIncome > previous.netIncome) score += 1;
 
   // F4: ROA higher than cost of capital (10% as benchmark)
   const roa = (latest.netIncome || 0) / (latest.totalAssets || 1);
-  if (roa > 0.10) score += 1;
+  if (latest.totalAssets && roa > 0.10) score += 1;
 
   // Leverage, Liquidity, and Source of Funds (3 points)
 
   // F5: Lower debt ratio
   const currentDebtRatio = (latest.totalDebt || 0) / (latest.totalAssets || 1);
   const previousDebtRatio = (previous.totalDebt || 0) / (previous.totalAssets || 1);
-  if (currentDebtRatio < previousDebtRatio) score += 1;
+  if (latest.totalAssets && previous.totalAssets && currentDebtRatio < previousDebtRatio) score += 1;
 
   // F6: Improved current ratio
   const currentCurrentRatio = latest.totalAssets / (latest.totalLiabilities || 1);
   const previousCurrentRatio = previous.totalAssets / (previous.totalLiabilities || 1);
-  if (currentCurrentRatio > previousCurrentRatio) score += 1;
+  if (latest.totalAssets && previous.totalAssets && currentCurrentRatio > previousCurrentRatio) score += 1;
 
   // F7: No new shares issued
   // This would require share count data, using equity growth as proxy
-  if (latest.equity > previous.equity) score += 1;
+  if (latest.equity && previous.equity && latest.equity > previous.equity) score += 1;
 
   // Operating Efficiency (2 points)
 
   // F8: Improved profit margin
-  const latestMargin = latest.revenue > 0 ? (latest.netIncome / latest.revenue) * 100 : 0;
-  const previousMargin = previous.revenue > 0 ? (previous.netIncome / previous.revenue) * 100 : 0;
-  if (latestMargin > previousMargin) score += 1;
+  const latestMargin = latest.revenue && latest.netIncome ? (latest.netIncome / latest.revenue) * 100 : 0;
+  const previousMargin = previous.revenue && previous.netIncome ? (previous.netIncome / previous.revenue) * 100 : 0;
+  if (latest.revenue && previous.revenue && latestMargin > previousMargin) score += 1;
 
   // F9: Improved asset turnover
-  const latestTurnover = latest.totalAssets > 0 ? latest.revenue / latest.totalAssets : 0;
-  const previousTurnover = previous.totalAssets > 0 ? previous.revenue / previous.totalAssets : 0;
-  if (latestTurnover > previousTurnover) score += 1;
+  const latestTurnover = latest.totalAssets && latest.revenue ? latest.revenue / latest.totalAssets : 0;
+  const previousTurnover = previous.totalAssets && previous.revenue ? previous.revenue / previous.totalAssets : 0;
+  if (latest.totalAssets && previous.totalAssets && latestTurnover > previousTurnover) score += 1;
 
   return score;
 }

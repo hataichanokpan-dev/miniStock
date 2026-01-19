@@ -39,20 +39,28 @@ async function getCompanyMetricsFMP(symbol: string): Promise<FinancialMetrics> {
   const ratio = ratios[0] || {};
   const prof = profile[0] || {};
 
+  const safeNum = (val: any): number | null => {
+    const num = parseFloat(val);
+    return isNaN(num) || val === null || val === undefined ? null : num;
+  };
+
   return {
-    revenue: metrics.revenue || 0,
-    revenueGrowth: parseFloat(metrics.revenueGrowth || '0'),
-    netIncome: metrics.netIncome || 0,
-    profitMargin: parseFloat(metrics.netProfitMargin || '0'),
-    peRatio: parseFloat(metrics.peRatio || '0'),
-    pbRatio: parseFloat(metrics.pbRatio || '0'),
-    roe: parseFloat(metrics.roe || '0'),
-    deRatio: parseFloat(metrics.debtToEquity || '0'),
-    eps: parseFloat(metrics.eps || '0'),
-    epsGrowth: parseFloat(metrics.epsGrowth || '0'),
-    freeCashFlow: metrics.freeCashFlow || 0,
-    dividendYield: parseFloat(metrics.dividendYield || '0'),
-    marketCap: prof.mktCap || 0,
+    revenue: safeNum(metrics.revenue),
+    revenueGrowth: safeNum(metrics.revenueGrowth),
+    netIncome: safeNum(metrics.netIncome),
+    profitMargin: safeNum(metrics.netProfitMargin),
+    grossMargin: null, // Not available in FMP key-metrics
+    operatingMargin: null,
+    peRatio: safeNum(metrics.peRatio),
+    pbRatio: safeNum(metrics.pbRatio),
+    roe: safeNum(metrics.roe),
+    deRatio: safeNum(metrics.debtToEquity),
+    interestCoverage: null,
+    eps: safeNum(metrics.eps),
+    epsGrowth: safeNum(metrics.epsGrowth),
+    freeCashFlow: safeNum(metrics.freeCashFlow),
+    dividendYield: safeNum(metrics.dividendYield),
+    marketCap: safeNum(prof.mktCap),
   };
 }
 
@@ -66,20 +74,31 @@ async function getCompanyMetricsAlphaVantage(symbol: string): Promise<FinancialM
     throw new Error(`No overview data found for symbol: ${symbol}`);
   }
 
+  const safeNum = (val: any): number | null => {
+    const num = parseFloat(val);
+    return isNaN(num) || val === null || val === undefined ? null : num;
+  };
+
+  const revenueTTM = safeNum(data.RevenueTTM);
+  const profitMargin = safeNum(data.ProfitMargin);
+
   return {
-    revenue: parseFloat(data.RevenueTTM || '0'),
-    revenueGrowth: parseFloat(data.RevenueGrowth || '0'),
-    netIncome: parseFloat(data.ProfitMargin || '0') * parseFloat(data.RevenueTTM || '0'),
-    profitMargin: parseFloat(data.ProfitMargin || '0'),
-    peRatio: parseFloat(data.PERatio || '0'),
-    pbRatio: parseFloat(data.PriceToBookRatio || '0'),
-    roe: parseFloat(data.ReturnOnEquityTTM || '0'),
-    deRatio: parseFloat(data.DebtToEquityRatio || '0'),
-    eps: parseFloat(data.EPS || '0'),
-    epsGrowth: 0, // Not directly available
-    freeCashFlow: 0, // Need cash flow endpoint
-    dividendYield: parseFloat(data.DividendYield || '0'),
-    marketCap: parseInt(data.MarketCapitalization || '0'),
+    revenue: revenueTTM,
+    revenueGrowth: safeNum(data.RevenueGrowth),
+    netIncome: profitMargin && revenueTTM ? profitMargin * revenueTTM : null,
+    profitMargin,
+    grossMargin: null,
+    operatingMargin: null,
+    peRatio: safeNum(data.PERatio),
+    pbRatio: safeNum(data.PriceToBookRatio),
+    roe: safeNum(data.ReturnOnEquityTTM),
+    deRatio: safeNum(data.DebtToEquityRatio),
+    interestCoverage: null,
+    eps: safeNum(data.EPS),
+    epsGrowth: null, // Not directly available
+    freeCashFlow: null,
+    dividendYield: safeNum(data.DividendYield),
+    marketCap: safeNum(data.MarketCapitalization),
   };
 }
 
