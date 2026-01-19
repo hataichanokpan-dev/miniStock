@@ -3,7 +3,8 @@
  * Phase 1: Data Layer Foundation
  */
 
-import { apiRequest } from './stock-api';
+import { apiRequest, getApiProvider } from './stock-api';
+import { getFinancialStatementsYahoo } from './yahoo-finance';
 import type { IncomeStatement, BalanceSheet, CashFlowStatement } from '@/types/financials';
 
 /**
@@ -13,8 +14,98 @@ export async function getIncomeStatement(
   symbol: string,
   period: 'annual' | 'quarter' = 'annual'
 ): Promise<IncomeStatement[]> {
+  const provider = getApiProvider();
+
+  if (provider === 'yahoo') {
+    const statements = await getFinancialStatementsYahoo(symbol);
+    return statements.incomeStatement;
+  } else if (provider === 'fmp') {
+    return getIncomeStatementFMP(symbol, period);
+  } else {
+    // Alpha Vantage - limited support
+    return [];
+  }
+}
+
+/**
+ * Fetch balance sheet
+ */
+export async function getBalanceSheet(
+  symbol: string,
+  period: 'annual' | 'quarter' = 'annual'
+): Promise<BalanceSheet[]> {
+  const provider = getApiProvider();
+
+  if (provider === 'yahoo') {
+    const statements = await getFinancialStatementsYahoo(symbol);
+    return statements.balanceSheet;
+  } else if (provider === 'fmp') {
+    return getBalanceSheetFMP(symbol, period);
+  } else {
+    // Alpha Vantage - limited support
+    return [];
+  }
+}
+
+/**
+ * Fetch cash flow statement
+ */
+export async function getCashFlowStatement(
+  symbol: string,
+  period: 'annual' | 'quarter' = 'annual'
+): Promise<CashFlowStatement[]> {
+  const provider = getApiProvider();
+
+  if (provider === 'yahoo') {
+    const statements = await getFinancialStatementsYahoo(symbol);
+    return statements.cashFlow;
+  } else if (provider === 'fmp') {
+    return getCashFlowStatementFMP(symbol, period);
+  } else {
+    // Alpha Vantage - limited support
+    return [];
+  }
+}
+
+/**
+ * Fetch all financial statements
+ */
+export async function getFinancialStatements(symbol: string) {
+  const provider = getApiProvider();
+
+  if (provider === 'yahoo') {
+    return getFinancialStatementsYahoo(symbol);
+  } else if (provider === 'fmp') {
+    const [incomeStatement, balanceSheet, cashFlow] = await Promise.all([
+      getIncomeStatementFMP(symbol, 'annual'),
+      getBalanceSheetFMP(symbol, 'annual'),
+      getCashFlowStatementFMP(symbol, 'annual'),
+    ]);
+
+    return {
+      incomeStatement,
+      balanceSheet,
+      cashFlow,
+    };
+  } else {
+    // Alpha Vantage - limited support
+    return {
+      incomeStatement: [],
+      balanceSheet: [],
+      cashFlow: [],
+    };
+  }
+}
+
+/**
+ * Financial Modeling Prep: Income statement
+ */
+async function getIncomeStatementFMP(
+  symbol: string,
+  period: 'annual' | 'quarter' = 'annual'
+): Promise<IncomeStatement[]> {
   const endpoint = period === 'annual' ? 'income-statement' : 'income-statement-as-reported';
-  const data = await apiRequest<any[]>(`${endpoint}/${symbol}`, {}, 'fmp');
+  const data = await apiRequest<any[]>(`${endpoint}/${symbol}`);
 
   if (!data || data.length === 0) {
     return [];
@@ -36,14 +127,14 @@ export async function getIncomeStatement(
 }
 
 /**
- * Fetch balance sheet
+ * Financial Modeling Prep: Balance sheet
  */
-export async function getBalanceSheet(
+async function getBalanceSheetFMP(
   symbol: string,
   period: 'annual' | 'quarter' = 'annual'
 ): Promise<BalanceSheet[]> {
   const endpoint = period === 'annual' ? 'balance-sheet-statement' : 'balance-sheet-statement-as-reported';
-  const data = await apiRequest<any[]>(`${endpoint}/${symbol}`, {}, 'fmp');
+  const data = await apiRequest<any[]>(`${endpoint}/${symbol}`);
 
   if (!data || data.length === 0) {
     return [];
@@ -65,14 +156,14 @@ export async function getBalanceSheet(
 }
 
 /**
- * Fetch cash flow statement
+ * Financial Modeling Prep: Cash flow statement
  */
-export async function getCashFlowStatement(
+async function getCashFlowStatementFMP(
   symbol: string,
   period: 'annual' | 'quarter' = 'annual'
 ): Promise<CashFlowStatement[]> {
   const endpoint = period === 'annual' ? 'cash-flow-statement' : 'cash-flow-statement-as-reported';
-  const data = await apiRequest<any[]>(`${endpoint}/${symbol}`, {}, 'fmp');
+  const data = await apiRequest<any[]>(`${endpoint}/${symbol}`);
 
   if (!data || data.length === 0) {
     return [];
@@ -90,21 +181,4 @@ export async function getCashFlowStatement(
     dividendPayments: item.dividendPayments || 0,
     stockBuybacks: item.stockBuyback || 0,
   }));
-}
-
-/**
- * Fetch all financial statements
- */
-export async function getFinancialStatements(symbol: string) {
-  const [incomeStatement, balanceSheet, cashFlow] = await Promise.all([
-    getIncomeStatement(symbol, 'annual'),
-    getBalanceSheet(symbol, 'annual'),
-    getCashFlowStatement(symbol, 'annual'),
-  ]);
-
-  return {
-    incomeStatement,
-    balanceSheet,
-    cashFlow,
-  };
 }

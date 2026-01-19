@@ -11,6 +11,135 @@ import type { IncomeStatement, BalanceSheet, CashFlowStatement } from '@/types/f
 import { withCache, CACHE_TTL } from './cache';
 
 /**
+ * Fetch financial statements from Yahoo Finance
+ * Yahoo Finance provides income statement, balance sheet, and cash flow data
+ */
+export async function getFinancialStatementsYahoo(symbol: string): Promise<{
+  incomeStatement: IncomeStatement[];
+  balanceSheet: BalanceSheet[];
+  cashFlow: CashFlowStatement[];
+}> {
+  const cacheKey = 'yahoo:statements:' + symbol;
+
+  return withCache(cacheKey, CACHE_TTL.FUNDAMENTALS, async () => {
+    try {
+      const [incomeData, balanceData, cashFlowData] = await Promise.all([
+        yahooFinance.quoteSummary(symbol, { modules: ['incomeStatementHistory'] }) as any,
+        yahooFinance.quoteSummary(symbol, { modules: ['balanceSheetHistory'] }) as any,
+        yahooFinance.quoteSummary(symbol, { modules: ['cashflowStatementHistory'] }) as any,
+      ]);
+
+      const incomeStatement = parseIncomeStatement(incomeData);
+      const balanceSheet = parseBalanceSheet(balanceData);
+      const cashFlow = parseCashFlowStatement(cashFlowData);
+
+      return {
+        incomeStatement,
+        balanceSheet,
+        cashFlow,
+      };
+    } catch (error) {
+      console.warn(`Yahoo Finance statements not available for ${symbol}:`, (error as Error).message);
+      // Return empty arrays if Yahoo Finance doesn't have statement data
+      return {
+        incomeStatement: [],
+        balanceSheet: [],
+        cashFlow: [],
+      };
+    }
+  });
+}
+
+/**
+ * Parse income statement from Yahoo Finance data
+ */
+function parseIncomeStatement(data: any): IncomeStatement[] {
+  const statements = data?.incomeStatementHistory?.incomeStatementHistory || [];
+  if (!Array.isArray(statements) || statements.length === 0) {
+    return [];
+  }
+
+  return statements.slice(0, 10).map((item: any) => {
+    const stmt = item[0];
+    const endDate = stmt.endDate?.Date || new Date().toISOString().split('T')[0];
+    const dateObj = new Date(endDate);
+
+    return {
+      fiscalDate: endDate,
+      fiscalYear: dateObj.getFullYear(),
+      fiscalPeriod: 'FY',
+      revenue: stmt.totalRevenue || 0,
+      costOfRevenue: stmt.costOfRevenue || 0,
+      grossProfit: stmt.grossProfit || 0,
+      operatingExpenses: stmt.totalOperatingExpenses || 0,
+      operatingIncome: stmt.operatingIncome || 0,
+      netIncome: stmt.netIncome || 0,
+      eps: stmt.epsBasic || 0,
+      epsDiluted: stmt.epsDiluted || 0,
+    };
+  });
+}
+
+/**
+ * Parse balance sheet from Yahoo Finance data
+ */
+function parseBalanceSheet(data: any): BalanceSheet[] {
+  const statements = data?.balanceSheetHistory?.balanceSheetStatements || [];
+  if (!Array.isArray(statements) || statements.length === 0) {
+    return [];
+  }
+
+  return statements.slice(0, 10).map((item: any) => {
+    const stmt = item[0];
+    const endDate = stmt.endDate?.Date || new Date().toISOString().split('T')[0];
+    const dateObj = new Date(endDate);
+
+    return {
+      fiscalDate: endDate,
+      fiscalYear: dateObj.getFullYear(),
+      fiscalPeriod: 'FY',
+      totalAssets: stmt.totalAssets || 0,
+      totalCurrentAssets: stmt.totalCurrentAssets || 0,
+      totalLiabilities: stmt.totalLiab || 0,
+      totalCurrentLiabilities: stmt.totalCurrentLiabilities || 0,
+      totalDebt: stmt.totalDebt || 0,
+      totalEquity: stmt.totalStockholderEquity || 0,
+      cashAndEquivalents: stmt.cash || 0,
+      inventory: stmt.inventory || 0,
+    };
+  });
+}
+
+/**
+ * Parse cash flow statement from Yahoo Finance data
+ */
+function parseCashFlowStatement(data: any): CashFlowStatement[] {
+  const statements = data?.cashflowStatementHistory?.cashflowStatements || [];
+  if (!Array.isArray(statements) || statements.length === 0) {
+    return [];
+  }
+
+  return statements.slice(0, 10).map((item: any) => {
+    const stmt = item[0];
+    const endDate = stmt.endDate?.Date || new Date().toISOString().split('T')[0];
+    const dateObj = new Date(endDate);
+
+    return {
+      fiscalDate: endDate,
+      fiscalYear: dateObj.getFullYear(),
+      fiscalPeriod: 'FY',
+      netIncome: stmt.netIncome || 0,
+      depreciation: stmt.depreciation || 0,
+      operatingCashFlow: stmt.totalCashFromOperatingActivities || 0,
+      capitalExpenditure: stmt.capitalExpenditures || 0,
+      freeCashFlow: (stmt.totalCashFromOperatingActivities || 0) + (stmt.capitalExpenditures || 0),
+      dividendPayments: stmt.dividendsPaid || 0,
+      stockBuybacks: Math.abs(stmt.netBorrowings || 0),
+    };
+  });
+}
+
+/**
  * Fetch real-time quote for a single stock from Yahoo Finance
  */
 export async function getQuoteYahoo(symbol: string): Promise<Quote> {

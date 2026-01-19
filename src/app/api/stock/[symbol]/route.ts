@@ -14,6 +14,8 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ symbol: string }> }
 ) {
+  let upperSymbol = '';
+
   try {
     // Validate API configuration
     const validationStatus = getApiValidationStatus();
@@ -29,7 +31,7 @@ export async function GET(
     }
 
     const { symbol } = await params;
-    const upperSymbol = symbol.toUpperCase();
+    upperSymbol = symbol.toUpperCase();
 
     if (!upperSymbol || upperSymbol.length === 0) {
       return NextResponse.json(
@@ -61,14 +63,28 @@ export async function GET(
     });
   } catch (error) {
     const errorMessage = (error as Error).message;
-    console.error('Error fetching stock data:', errorMessage);
+    const provider = getApiProvider();
+    console.error(`Error fetching stock data from ${provider}:`, errorMessage);
 
-    // Return actionable error details
+    // Return actionable error details with provider context
+    let errorDetails = errorMessage;
+    if (provider === 'yahoo') {
+      if (errorMessage.includes('404') || errorMessage.includes('not found')) {
+        errorDetails = `Invalid stock symbol: ${upperSymbol || 'unknown'}. Yahoo Finance could not find data for this symbol.`;
+      } else if (errorMessage.includes('rate limit') || errorMessage.includes('429')) {
+        errorDetails = 'Yahoo Finance rate limit exceeded. Please try again in a few minutes.';
+      } else {
+        errorDetails = `Yahoo Finance error: ${errorMessage}`;
+      }
+    } else if (provider === 'fmp') {
+      errorDetails = `FMP API error: ${errorMessage}. Check your API key configuration.`;
+    }
+
     return NextResponse.json(
       {
         error: 'Failed to fetch stock data',
-        details: errorMessage,
-        provider: getApiProvider(),
+        details: errorDetails,
+        provider,
         timestamp: Date.now(),
       },
       { status: 500 }
