@@ -169,7 +169,7 @@ export default function SectorFlowDashboard({
       {/* SECTION 2: Value Distribution */}
       <div>
         <div className="flex items-center justify-between mb-3">
-          <h4 className="text-sm font-semibold text-gray-700">Today's Value by Sector</h4>
+          <h4 className="text-sm font-semibold text-gray-700">Today&apos;s Value by Sector</h4>
           <span className="text-xs text-gray-500">Total: ฿{formatNumber(totalMarketValue)}Mn</span>
         </div>
 
