@@ -7,7 +7,9 @@ import type { Quote } from '@/types/market';
 import type { FinancialMetrics } from '@/types/financials';
 import Card from '@/components/ui/Card';
 import StatusBadge from '@/components/ui/StatusBadge';
-import { LineChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
+import PriceChart from '@/components/stock/PriceChart';
+import ValuationCard from '@/components/stock/ValuationCard';
+import PeerComparison from '@/components/stock/PeerComparison';
 import { formatPercent, formatTradingValueMn, getChangeColor } from '@/lib/format';
 
 const DATA_FRESHNESS_THRESHOLD = {
@@ -332,9 +334,6 @@ export default function StockDetailPage() {
     stale: { label: 'Stale', status: 'danger' as const, color: 'text-red-600' },
   };
 
-  // Check if we have enough historical data for the chart
-  const hasValidChartData = historicalData.length >= 2;
-
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Professional Header */}
@@ -441,61 +440,12 @@ export default function StockDetailPage() {
 
         {/* Charts Row */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-          {/* Price Chart */}
+          {/* Price Chart with Moving Averages */}
           <div className="lg:col-span-2">
-            <Card title="Price Chart (1 Year)" subtitle={hasValidChartData ? 'Last 90 trading days' : 'Historical data not available'}>
-              {hasValidChartData ? (
-                <div className="h-64 sm:h-80">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={historicalData.slice(-90)}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
-                      <XAxis
-                        dataKey="date"
-                        tickFormatter={(v) => new Date(v).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                        tick={{ fontSize: 11, fill: '#6b7280' }}
-                      />
-                      <YAxis
-                        tickFormatter={(v) => v.toFixed(2)}
-                        tick={{ fontSize: 11, fill: '#6b7280' }}
-                        domain={['auto', 'auto']}
-                      />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: 'rgba(30, 58, 95, 0.95)',
-                          border: '1px solid #e5e7eb',
-                          borderRadius: '4px',
-                        }}
-                        labelFormatter={(v) => new Date(v).toLocaleDateString()}
-                        formatter={(value) => {
-                          if (typeof value === 'number') {
-                            return `$${value.toFixed(2)}`;
-                          }
-                          return '';
-                        }}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="close"
-                        stroke="#1e3a5f"
-                        strokeWidth={2}
-                        dot={false}
-                        activeDot={{ r: 4 }}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              ) : (
-                <div className="h-64 sm:h-80 flex items-center justify-center bg-gray-50 rounded-lg border border-gray-200">
-                  <div className="text-center">
-                    <span className="text-3xl mb-2">📈</span>
-                    <p className="text-sm text-gray-500">No historical data available</p>
-                    <p className="text-xs text-gray-400 mt-1">
-                      Try US stocks (AAPL, MSFT, GOOGL) for best data coverage
-                    </p>
-                  </div>
-                </div>
-              )}
-            </Card>
+            <PriceChart
+              historicalData={historicalData}
+              symbol={symbol}
+            />
           </div>
 
           {/* Quick Stats */}
@@ -504,15 +454,19 @@ export default function StockDetailPage() {
             <Card title="Analysis Status" subtitle="Available analysis tools">
               <div className="space-y-3">
                 <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-600">Valuation Analysis</span>
+                  <span className="text-xs bg-green-100 px-2 py-1 rounded text-green-700">✓ Active</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-600">Peer Comparison</span>
+                  <span className="text-xs bg-green-100 px-2 py-1 rounded text-green-700">✓ Active</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-600">CAN SLIM</span>
                   <span className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-500">Phase 2</span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-600">SPEA</span>
-                  <span className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-500">Phase 2</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600">Value Metrics</span>
                   <span className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-500">Phase 2</span>
                 </div>
               </div>
@@ -537,7 +491,7 @@ export default function StockDetailPage() {
                   disabled
                   className="w-full px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-left"
                 >
-                  📊 Compare (Coming Soon)
+                  🔔 Set Price Alert (Coming Soon)
                 </button>
               </div>
             </Card>
@@ -597,6 +551,20 @@ export default function StockDetailPage() {
             />
           </div>
         </Card>
+
+        {/* Valuation Analysis */}
+        <ValuationCard
+          symbol={symbol}
+          currentPrice={quote.price}
+          metrics={metrics}
+        />
+
+        {/* Peer Comparison */}
+        <PeerComparison
+          symbol={symbol}
+          sector={profile?.sector}
+          currentMetrics={metrics}
+        />
 
         {/* Company Profile (if available) */}
         {profile?.description && (

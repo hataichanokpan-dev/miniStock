@@ -237,3 +237,59 @@ export async function getInvestorTypeDates(): Promise<string[]> {
     return [];
   }
 }
+
+/**
+ * Get industry sector historical data for the last N days
+ * @param days - Number of days to look back (default: 28 days for 4 weeks)
+ */
+export async function getIndustrySectorHistory(days: number = 28): Promise<IndustrySectorResponse[]> {
+  try {
+    const dates = await getIndustrySectorDates();
+    if (dates.length === 0) {
+      return [];
+    }
+
+    // Take the most recent N days (excluding duplicates)
+    const uniqueDates = Array.from(new Set(dates)).slice(0, days);
+
+    const results = await Promise.all(
+      uniqueDates.map(date => getIndustrySectorByDate(date))
+    );
+
+    // Filter out nulls and sort by date
+    return results
+      .filter((data): data is IndustrySectorResponse => data !== null)
+      .sort((a, b) => a.date.localeCompare(b.date));
+  } catch (error) {
+    console.error('Error fetching industry sector history:', error);
+    return [];
+  }
+}
+
+/**
+ * Get investor type historical data for the last N days
+ * @param days - Number of days to look back (default: 28 days for 4 weeks)
+ */
+export async function getInvestorTypeHistory(days: number = 28): Promise<InvestorTypeResponse[]> {
+  try {
+    const dates = await getInvestorTypeDates();
+    if (dates.length === 0) {
+      return [];
+    }
+
+    // Take the most recent N days (excluding duplicates)
+    const uniqueDates = Array.from(new Set(dates)).slice(0, days);
+
+    const results = await Promise.all(
+      uniqueDates.map(date => getInvestorTypeByDate(date))
+    );
+
+    // Filter out nulls and sort by date
+    return results
+      .filter((data): data is InvestorTypeResponse => data !== null)
+      .sort((a, b) => a.date.localeCompare(b.date));
+  } catch (error) {
+    console.error('Error fetching investor type history:', error);
+    return [];
+  }
+}
