@@ -5,21 +5,12 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getCompanyMetrics, getCompanyProfile } from '@/lib/api/fundamentals';
-import { validateApiKey } from '@/lib/api/stock-api';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ symbol: string }> }
 ) {
   try {
-    // Validate API key
-    if (!validateApiKey()) {
-      return NextResponse.json(
-        { error: 'API key not configured' },
-        { status: 500 }
-      );
-    }
-
     const { symbol } = await params;
     const upperSymbol = symbol.toUpperCase();
 
