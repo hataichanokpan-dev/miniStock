@@ -55,7 +55,7 @@ export default function TopRankingsCard({ topByValue, topByVolume }: TopRankings
               </div>
               <div className="text-right flex-shrink-0 ml-2">
                 <p className={`text-xs sm:text-sm font-bold ${getChangeColor(stock.chgPct)}`}>
-                  {stock.chgPct >= 0 ? '+' : ''}{formatPercent(stock.chgPct)}
+                  {formatPercent(stock.chgPct)}
                 </p>
               </div>
             </div>
@@ -92,7 +92,7 @@ export default function TopRankingsCard({ topByValue, topByVolume }: TopRankings
               </div>
               <div className="text-right flex-shrink-0 ml-2">
                 <p className={`text-xs sm:text-sm font-bold ${getChangeColor(stock.chgPct)}`}>
-                  {stock.chgPct >= 0 ? '+' : ''}{formatPercent(stock.chgPct)}
+                   {formatPercent(stock.chgPct)}
                 </p>
               </div>
             </div>
