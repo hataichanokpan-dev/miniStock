@@ -15,6 +15,13 @@ const DATA_FRESHNESS_THRESHOLD = {
 
 type DataStatus = 'fresh' | 'delayed' | 'stale';
 
+interface ApiError {
+  error: string;
+  details?: string;
+  provider?: string;
+  status?: number;
+}
+
 function getDataStatus(timestamp: number): DataStatus {
   const age = Date.now() - timestamp;
   if (age <= DATA_FRESHNESS_THRESHOLD.FRESH) return 'fresh';
@@ -92,6 +99,25 @@ function MetricCard({ title, value, explanation, status = 'neutral' }: MetricCar
   );
 }
 
+function getActionableErrorMessage(error: ApiError): string {
+  if (error.details?.includes('Missing NEXT_PUBLIC_STOCK_API_KEY')) {
+    return 'API configuration error: Stock data provider requires an API key. Please check server environment variables.';
+  }
+  if (error.details?.includes('API key not configured')) {
+    return 'API key not configured. Please set NEXT_PUBLIC_STOCK_API_KEY environment variable.';
+  }
+  if (error.provider) {
+    return `Stock API error using ${error.provider.toUpperCase()} provider: ${error.details || error.error}`;
+  }
+  if (error.status === 404) {
+    return `Stock symbol not found or data unavailable.`;
+  }
+  if (error.status === 500) {
+    return `Server error: ${error.details || 'Unable to fetch stock data. Please try again later.'}`;
+  }
+  return error.details || error.error || 'Failed to load stock data';
+}
+
 export default function StockDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -102,7 +128,7 @@ export default function StockDetailPage() {
   const [profile, setProfile] = useState<any>(null);
   const [historicalData, setHistoricalData] = useState<Array<{ date: string; close: number }>>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ApiError | null>(null);
 
   useEffect(() => {
     if (!symbol) return;
@@ -118,26 +144,41 @@ export default function StockDetailPage() {
           fetch('/api/stock/' + symbol + '/historical?period=1y'),
         ]);
 
-        if (!quoteRes.ok || !fundamentalsRes.ok || !historicalRes.ok) {
-          throw new Error('Failed to fetch stock data');
-        }
-
         const [quoteData, fundamentalsData, historicalData] = await Promise.all([
           quoteRes.json(),
           fundamentalsRes.json(),
           historicalRes.json(),
         ]);
 
-        if (quoteData.error) throw new Error(quoteData.error);
-        if (fundamentalsData.error) throw new Error(fundamentalsData.error);
-        if (historicalData.error) throw new Error(historicalData.error);
+        // Check for API errors
+        if (!quoteRes.ok) {
+          throw new Error(JSON.stringify({ ...quoteData, status: quoteRes.status }));
+        }
+        if (!fundamentalsRes.ok) {
+          throw new Error(JSON.stringify({ ...fundamentalsData, status: fundamentalsRes.status }));
+        }
+        if (!historicalRes.ok) {
+          throw new Error(JSON.stringify({ ...historicalData, status: historicalRes.status }));
+        }
+
+        if (quoteData.error) throw new Error(JSON.stringify(quoteData));
+        if (fundamentalsData.error) throw new Error(JSON.stringify(fundamentalsData));
+        if (historicalData.error) throw new Error(JSON.stringify(historicalData));
 
         setQuote(quoteData);
         setMetrics(fundamentalsData.metrics);
         setProfile(fundamentalsData.profile);
         setHistoricalData((historicalData.data || []).map((h: any) => ({ date: h.date, close: h.close })));
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load stock data');
+        if (err instanceof Error) {
+          try {
+            setError(JSON.parse(err.message));
+          } catch {
+            setError({ error: err.message });
+          }
+        } else {
+          setError({ error: 'Failed to load stock data' });
+        }
       } finally {
         setLoading(false);
       }
@@ -163,12 +204,19 @@ export default function StockDetailPage() {
   }
 
   if (error) {
+    const errorMessage = getActionableErrorMessage(error);
     return (
       <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
         <Card>
           <div className='text-center py-12'>
             <h2 className='text-xl font-semibold text-gray-900 mb-2'>Error Loading Stock Data</h2>
-            <p className='text-gray-600 mb-6'>{error}</p>
+            <p className='text-gray-600 mb-2'>{symbol}</p>
+            <div className='max-w-lg mx-auto mb-6 p-4 bg-red-50 border border-red-200 rounded-lg'>
+              <p className='text-sm text-red-800'>{errorMessage}</p>
+              {error.provider && (
+                <p className='text-xs text-red-600 mt-2'>Provider: {error.provider.toUpperCase()}</p>
+              )}
+            </div>
             <button onClick={() => router.push('/stocks')} className='btn btn-secondary'>
               Back to Stocks
             </button>
