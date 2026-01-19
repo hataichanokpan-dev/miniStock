@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect } from 'react';
+import SidebarSearch from './SidebarSearch';
 
 const navItems = [
   { href: '/', label: 'Dashboard', icon: '📊' },
@@ -102,6 +103,9 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
               })}
             </nav>
           </div>
+
+          {/* Stock Search */}
+          <SidebarSearch />
 
           {/* Market Selector */}
           <div className="p-6 border-t border-gray-200">
