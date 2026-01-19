@@ -318,9 +318,12 @@ export default function MarketPage() {
           </div>
           <button
             onClick={() => window.location.reload()}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1e3a5f] self-start"
+            className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors self-start"
+            aria-label="Refresh"
           >
-            Refresh
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5m-.582 0a8.001 8.001 0 00-15.356-2m15.357 2A15.373 15.373 0 0021 12.21c-2.688 0-5.217-2.06-9-5.821" />
+            </svg>
           </button>
         </div>
       </div>
