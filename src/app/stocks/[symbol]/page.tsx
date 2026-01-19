@@ -224,7 +224,7 @@ export default function StockDetailPage() {
                 <LineChart data={historicalData.slice(-90)}>
                   <XAxis dataKey='date' tickFormatter={(v) => new Date(v).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} />
                   <YAxis tickFormatter={(v) => v.toFixed(0)} />
-                  <Tooltip labelFormatter={(v) => new Date(v).toLocaleDateString()} formatter={(v: number) => ['$' + v.toFixed(2), 'Price']} />
+                  <Tooltip labelFormatter={(v) => new Date(v).toLocaleDateString()} formatter={(value) => typeof value === 'number' ? ['$' + value.toFixed(2), 'Price'] : ['', '']} />
                   <Line type='monotone' dataKey='close' stroke='#1e3a5f' strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
