@@ -503,49 +503,49 @@ export default function StockDetailPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <MetricCard
               title={METRIC_EXPLANATIONS.revenueGrowth.title}
-              value={metrics?.revenueGrowth !== undefined ? formatPercent(metrics.revenueGrowth) : null}
+              value={metrics?.revenueGrowth != null ? formatPercent(metrics.revenueGrowth) : null}
               explanation={METRIC_EXPLANATIONS.revenueGrowth.explanation}
-              status={metrics?.revenueGrowth && metrics.revenueGrowth > 0 ? 'success' : metrics?.revenueGrowth && metrics.revenueGrowth < 0 ? 'danger' : 'neutral'}
+              status={metrics?.revenueGrowth != null && metrics.revenueGrowth > 0 ? 'success' : metrics?.revenueGrowth != null && metrics.revenueGrowth < 0 ? 'danger' : 'neutral'}
             />
             <MetricCard
               title={METRIC_EXPLANATIONS.epsGrowth.title}
-              value={metrics?.epsGrowth !== undefined ? formatPercent(metrics.epsGrowth) : null}
+              value={metrics?.epsGrowth != null ? formatPercent(metrics.epsGrowth) : null}
               explanation={METRIC_EXPLANATIONS.epsGrowth.explanation}
-              status={metrics?.epsGrowth && metrics.epsGrowth > 0 ? 'success' : metrics?.epsGrowth && metrics.epsGrowth < 0 ? 'danger' : 'neutral'}
+              status={metrics?.epsGrowth != null && metrics.epsGrowth > 0 ? 'success' : metrics?.epsGrowth != null && metrics.epsGrowth < 0 ? 'danger' : 'neutral'}
             />
             <MetricCard
               title={METRIC_EXPLANATIONS.roe.title}
-              value={metrics?.roe !== undefined ? metrics.roe.toFixed(2) : null}
+              value={metrics?.roe != null ? metrics.roe.toFixed(2) : null}
               explanation={METRIC_EXPLANATIONS.roe.explanation}
-              status={metrics?.roe && metrics.roe > 15 ? 'success' : metrics?.roe && metrics.roe < 5 ? 'danger' : 'neutral'}
+              status={metrics?.roe != null && metrics.roe > 15 ? 'success' : metrics?.roe != null && metrics.roe < 5 ? 'danger' : 'neutral'}
             />
             <MetricCard
               title={METRIC_EXPLANATIONS.profitMargin.title}
-              value={metrics?.profitMargin !== undefined ? formatPercent(metrics.profitMargin * 100) : null}
+              value={metrics?.profitMargin != null ? formatPercent(metrics.profitMargin * 100) : null}
               explanation={METRIC_EXPLANATIONS.profitMargin.explanation}
-              status={metrics?.profitMargin && metrics.profitMargin > 0.1 ? 'success' : metrics?.profitMargin && metrics.profitMargin < 0 ? 'danger' : 'neutral'}
+              status={metrics?.profitMargin != null && metrics.profitMargin > 0.1 ? 'success' : metrics?.profitMargin != null && metrics.profitMargin < 0 ? 'danger' : 'neutral'}
             />
             <MetricCard
               title={METRIC_EXPLANATIONS.deRatio.title}
-              value={metrics?.deRatio !== undefined ? metrics.deRatio.toFixed(2) : null}
+              value={metrics?.deRatio != null ? metrics.deRatio.toFixed(2) : null}
               explanation={METRIC_EXPLANATIONS.deRatio.explanation}
-              status={metrics?.deRatio && metrics.deRatio > 2 ? 'warning' : 'neutral'}
+              status={metrics?.deRatio != null && metrics.deRatio > 2 ? 'warning' : 'neutral'}
             />
             <MetricCard
               title={METRIC_EXPLANATIONS.peRatio.title}
-              value={metrics?.peRatio !== undefined && metrics.peRatio > 0 ? metrics.peRatio.toFixed(2) : null}
+              value={metrics?.peRatio != null && metrics.peRatio > 0 ? metrics.peRatio.toFixed(2) : null}
               explanation={METRIC_EXPLANATIONS.peRatio.explanation}
               status='neutral'
             />
             <MetricCard
               title={METRIC_EXPLANATIONS.pbRatio.title}
-              value={metrics?.pbRatio !== undefined && metrics.pbRatio > 0 ? metrics.pbRatio.toFixed(2) : null}
+              value={metrics?.pbRatio != null && metrics.pbRatio > 0 ? metrics.pbRatio.toFixed(2) : null}
               explanation={METRIC_EXPLANATIONS.pbRatio.explanation}
               status='neutral'
             />
             <MetricCard
               title={METRIC_EXPLANATIONS.dividendYield.title}
-              value={metrics?.dividendYield !== undefined && metrics.dividendYield > 0 ? formatPercent(metrics.dividendYield * 100) : null}
+              value={metrics?.dividendYield != null && metrics.dividendYield > 0 ? formatPercent(metrics.dividendYield * 100) : null}
               explanation={METRIC_EXPLANATIONS.dividendYield.explanation}
               status='neutral'
             />
