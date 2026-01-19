@@ -10,6 +10,7 @@ import {
   InvestorType,
   IndustrySectorResponse,
   InvestorTypeResponse,
+  TopRankingsResponse,
 } from '@/types/settrade';
 
 /**
@@ -290,6 +291,96 @@ export async function getInvestorTypeHistory(days: number = 28): Promise<Investo
       .sort((a, b) => a.date.localeCompare(b.date));
   } catch (error) {
     console.error('Error fetching investor type history:', error);
+    return [];
+  }
+}
+
+/**
+ * Get the latest top rankings data from Firebase
+ * Top stocks by value and volume
+ */
+export async function getLatestTopRankings(): Promise<TopRankingsResponse | null> {
+  try {
+    const latestRef = ref(db, 'settrade/topRankings/latest');
+    const latestSnapshot = await get(latestRef);
+
+    if (!latestSnapshot.exists()) {
+      console.warn('No top rankings latest data found');
+      return null;
+    }
+
+    const latest = latestSnapshot.val();
+    const date = latest.date;
+
+    // Fetch the actual data using the reference path
+    const dataRef = ref(db, `settrade/topRankings/byDate/${date}`);
+    const dataSnapshot = await get(dataRef);
+
+    if (!dataSnapshot.exists()) {
+      console.warn(`No top rankings data found for date: ${date}`);
+      return null;
+    }
+
+    const data = dataSnapshot.val();
+
+    return {
+      date,
+      capturedAt: data.meta.capturedAt,
+      topByValue: data.data.topByValue || [],
+      topByVolume: data.data.topByVolume || [],
+    };
+  } catch (error) {
+    console.error('Error fetching top rankings data:', error);
+    return null;
+  }
+}
+
+/**
+ * Get top rankings data for a specific date
+ */
+export async function getTopRankingsByDate(date: string): Promise<TopRankingsResponse | null> {
+  try {
+    const dataRef = ref(db, `settrade/topRankings/byDate/${date}`);
+    const dataSnapshot = await get(dataRef);
+
+    if (!dataSnapshot.exists()) {
+      console.warn(`No top rankings data found for date: ${date}`);
+      return null;
+    }
+
+    const data = dataSnapshot.val();
+
+    return {
+      date,
+      capturedAt: data.meta.capturedAt,
+      topByValue: data.data.topByValue || [],
+      topByVolume: data.data.topByVolume || [],
+    };
+  } catch (error) {
+    console.error(`Error fetching top rankings data for date ${date}:`, error);
+    return null;
+  }
+}
+
+/**
+ * Get available dates for top rankings data
+ */
+export async function getTopRankingsDates(): Promise<string[]> {
+  try {
+    const indexRef = ref(db, 'settrade/topRankings/indexByDate');
+    const indexSnapshot = await get(indexRef);
+
+    if (!indexSnapshot.exists()) {
+      return [];
+    }
+
+    const index = indexSnapshot.val();
+    const dates = Object.values(index).map((entry: any) => entry.date);
+
+    // Sort dates descending (newest first)
+    return dates.sort((a, b) => b.localeCompare(a));
+  } catch (error) {
+    console.error('Error fetching top rankings dates:', error);
     return [];
   }
 }

@@ -110,3 +110,38 @@ export interface InvestorTypeResponse {
     sellPct: number;
   }>;
 }
+
+// Top Rankings row data
+export interface TopRankingRow {
+  symbol: string;
+  name: string;
+  last: number;
+  change: number;
+  chgPct: number;
+  valMillion: number;
+  volMillion: number;
+}
+
+// Top Rankings by date entry
+export interface TopRankingsByDate {
+  meta: SettradeMeta;
+  data: {
+    topByValue: TopRankingRow[];
+    topByVolume: TopRankingRow[];
+  };
+}
+
+// Top Rankings collection
+export interface TopRankings {
+  byDate: Record<string, TopRankingsByDate>;
+  indexByDate: Record<string, SettradeDateIndex>;
+  latest: SettradeLatest;
+}
+
+// Top Rankings API response
+export interface TopRankingsResponse {
+  date: string;
+  capturedAt: string;
+  topByValue: TopRankingRow[];
+  topByVolume: TopRankingRow[];
+}

@@ -6,6 +6,8 @@ import MarketIndexCard from '@/components/ui/MarketIndexCard';
 import SectorFlowDashboard from '@/components/settrade/SectorFlowDashboard';
 import SectorSummaryCard from '@/components/settrade/SectorSummaryCard';
 import InvestorFlowCard from '@/components/settrade/InvestorFlowCard';
+import TopRankingsCard from '@/components/settrade/TopRankingsCard';
+import { MultiTrendChart, InvestorFlowTrendChart, InvestorFlowDataPoint } from '@/components/settrade/TrendChart';
 import { formatPercent, getChangeColor } from '@/lib/format';
 
 interface MarketIndex {
@@ -54,8 +56,59 @@ export default function MarketPage() {
     date: string;
     capturedAt: string;
   } | null>(null);
+  const [topRankingsData, setTopRankingsData] = useState<{
+    topByValue: Array<{
+      symbol: string;
+      name: string;
+      last: number;
+      change: number;
+      chgPct: number;
+      valMillion: number;
+      volMillion: number;
+    }>;
+    topByVolume: Array<{
+      symbol: string;
+      name: string;
+      last: number;
+      change: number;
+      chgPct: number;
+      valMillion: number;
+      volMillion: number;
+    }>;
+    date: string;
+    capturedAt: string;
+  } | null>(null);
   const [settradeLoading, setSettradeLoading] = useState(true);
   const [settradeError, setSettradeError] = useState<string | null>(null);
+
+  // Historical data states
+  const [sectorHistory, setSectorHistory] = useState<Array<{
+    date: string;
+    capturedAt: string;
+    sectors: Array<{
+      id: string;
+      name: string;
+      last: number;
+      chg: number;
+      chgPct: number;
+      volK: number;
+      valMn: number;
+    }>;
+  }>>([]);
+  const [investorHistory, setInvestorHistory] = useState<Array<{
+    date: string;
+    capturedAt: string;
+    investors: Array<{
+      id: string;
+      name: string;
+      buyValue: number;
+      sellValue: number;
+      netValue: number;
+      buyPct: number;
+      sellPct: number;
+    }>;
+  }>>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   // Fetch market indices
   useEffect(() => {
@@ -96,13 +149,15 @@ export default function MarketPage() {
       try {
         setSettradeLoading(true);
 
-        const [sectorRes, investorRes] = await Promise.all([
+        const [sectorRes, investorRes, topRankingsRes] = await Promise.all([
           fetch('/api/settrade/industry-sector'),
           fetch('/api/settrade/investor-type'),
+          fetch('/api/settrade/top-rankings'),
         ]);
 
         const sectorResult = sectorRes.ok ? await sectorRes.json() : null;
         const investorResult = investorRes.ok ? await investorRes.json() : null;
+        const topRankingsResult = topRankingsRes.ok ? await topRankingsRes.json() : null;
 
         if (sectorResult) {
           setSectorData(sectorResult);
@@ -112,7 +167,11 @@ export default function MarketPage() {
           setInvestorData(investorResult);
         }
 
-        if (!sectorResult && !investorResult) {
+        if (topRankingsResult) {
+          setTopRankingsData(topRankingsResult);
+        }
+
+        if (!sectorResult && !investorResult && !topRankingsResult) {
           setSettradeError('Failed to load Thailand market data');
         } else {
           setSettradeError(null);
@@ -127,6 +186,40 @@ export default function MarketPage() {
 
     fetchSettradeData();
   }, []);
+
+  // Fetch historical data when switching to sectors or investors tab
+  useEffect(() => {
+    async function fetchHistoricalData() {
+      if (activeTab !== 'sectors' && activeTab !== 'investors') return;
+      if (sectorHistory.length > 0 && investorHistory.length > 0) return; // Already loaded
+
+      try {
+        setHistoryLoading(true);
+
+        const [sectorRes, investorRes] = await Promise.all([
+          fetch('/api/settrade/sector-history?days=28'),
+          fetch('/api/settrade/investor-history?days=28'),
+        ]);
+
+        const sectorResult = sectorRes.ok ? await sectorRes.json() : null;
+        const investorResult = investorRes.ok ? await investorRes.json() : null;
+
+        if (sectorResult?.data) {
+          setSectorHistory(sectorResult.data);
+        }
+
+        if (investorResult?.data) {
+          setInvestorHistory(investorResult.data);
+        }
+      } catch (err) {
+        console.error('Error fetching historical data:', err);
+      } finally {
+        setHistoryLoading(false);
+      }
+    }
+
+    fetchHistoricalData();
+  }, [activeTab]);
 
   const tabs: Array<{ key: TabKey; label: string; icon: string }> = [
     { key: 'overview', label: 'Overview', icon: '📊' },
@@ -143,6 +236,71 @@ export default function MarketPage() {
     advancing: sectorData.sectors.filter((s: any) => s.chgPct > 0).length,
     declining: sectorData.sectors.filter((s: any) => s.chgPct < 0).length,
   } : null;
+
+  // Process sector history for chart
+  const processSectorHistoryForChart = (history: typeof sectorHistory) => {
+    const topSectors = ['ENERG', 'BANK', 'ICT', 'FOOD', 'FINCIAL', 'HELTH', 'TRANS', 'INDUS'];
+    const chartData: Array<{ date: string; [key: string]: string | number }> = [];
+
+    history.forEach((dayData) => {
+      const dataPoint: { date: string; [key: string]: string | number } = { date: dayData.date };
+      const sectorMap = new Map(dayData.sectors.map(s => [s.id, s.valMn]));
+
+      topSectors.forEach((sectorId) => {
+        dataPoint[sectorId] = sectorMap.get(sectorId) || 0;
+      });
+
+      chartData.push(dataPoint);
+    });
+
+    return chartData;
+  };
+
+  // Process investor history for chart
+  const processInvestorHistoryForChart = (history: typeof investorHistory) => {
+    const investorTypes = ['FOREIGN', 'LOCAL_INDIVIDUAL', 'LOCAL_INST', 'PROPRIETARY'];
+    const chartData: Array<{ date: string; [key: string]: string | number }> = [];
+
+    history.forEach((dayData) => {
+      const dataPoint: { date: string; [key: string]: string | number } = { date: dayData.date };
+      const investorMap = new Map(dayData.investors.map(i => [i.id, i.netValue]));
+
+      investorTypes.forEach((typeId) => {
+        dataPoint[typeId] = investorMap.get(typeId) || 0;
+      });
+
+      chartData.push(dataPoint);
+    });
+
+    return chartData;
+  };
+
+  // Process investor history for flow chart (with buy/sell data)
+  const processInvestorHistoryForFlowChart = (history: typeof investorHistory): InvestorFlowDataPoint[] => {
+    return history.map((dayData) => {
+      const dataPoint: InvestorFlowDataPoint = {
+        date: dayData.date,
+        FOREIGN: { buy: 0, sell: 0, net: 0 },
+        LOCAL_INST: { buy: 0, sell: 0, net: 0 },
+        PROPRIETARY: { buy: 0, sell: 0, net: 0 },
+        LOCAL_INDIVIDUAL: { buy: 0, sell: 0, net: 0 },
+      };
+
+      dayData.investors.forEach((investor) => {
+        if (investor.id === 'FOREIGN') {
+          dataPoint.FOREIGN = { buy: investor.buyValue, sell: investor.sellValue, net: investor.netValue };
+        } else if (investor.id === 'LOCAL_INST') {
+          dataPoint.LOCAL_INST = { buy: investor.buyValue, sell: investor.sellValue, net: investor.netValue };
+        } else if (investor.id === 'PROPRIETARY') {
+          dataPoint.PROPRIETARY = { buy: investor.buyValue, sell: investor.sellValue, net: investor.netValue };
+        } else if (investor.id === 'LOCAL_INDIVIDUAL') {
+          dataPoint.LOCAL_INDIVIDUAL = { buy: investor.buyValue, sell: investor.sellValue, net: investor.netValue };
+        }
+      });
+
+      return dataPoint;
+    });
+  };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -239,18 +397,31 @@ export default function MarketPage() {
                 ⚠️ {settradeError} — Check Firebase configuration and database permissions
               </div>
             ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {/* Sector Summary Chart Card */}
-                {sectorData && (
-                  <Card title="Sector Overview" subtitle={sectorData.date}>
-                    <SectorSummaryCard sectors={sectorData.sectors} limit={6} />
-                  </Card>
-                )}
+              <div className="space-y-4">
+                {/* Top row: Sector Summary + Investor Flow */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {/* Sector Summary Chart Card */}
+                  {sectorData && (
+                    <Card title="Sector Overview" subtitle={sectorData.date}>
+                      <SectorSummaryCard sectors={sectorData.sectors} limit={6} />
+                    </Card>
+                  )}
 
-                {/* Investor Flow Card */}
-                {investorData && (
-                  <Card title="Investor Flow" subtitle={investorData.date}>
-                    <InvestorFlowCard investors={investorData.investors} showTitle={false} />
+                  {/* Investor Flow Card */}
+                  {investorData && (
+                    <Card title="Investor Flow" subtitle={investorData.date}>
+                      <InvestorFlowCard investors={investorData.investors} showTitle={false} />
+                    </Card>
+                  )}
+                </div>
+
+                {/* Top Rankings Card */}
+                {topRankingsData && (
+                  <Card title="Top Rankings" subtitle={topRankingsData.date}>
+                    <TopRankingsCard
+                      topByValue={topRankingsData.topByValue}
+                      topByVolume={topRankingsData.topByVolume}
+                    />
                   </Card>
                 )}
               </div>
@@ -261,7 +432,8 @@ export default function MarketPage() {
 
       {/* Sectors Tab */}
       {activeTab === 'sectors' && (
-        <div>
+        <div className="space-y-6">
+          {/* Today's Sector Flow */}
           {settradeLoading ? (
             <div className="animate-pulse h-96 bg-gray-200 rounded-lg"></div>
           ) : settradeError ? (
@@ -283,12 +455,31 @@ export default function MarketPage() {
               <p className="text-gray-500">No sector data available at this time.</p>
             </Card>
           )}
+
+          {/* Sector Trend (4 weeks) */}
+          {historyLoading ? (
+            <div className="animate-pulse h-64 bg-gray-200 rounded-lg"></div>
+          ) : sectorHistory.length > 0 ? (
+            <MultiTrendChart
+              title="Sector Value Trend (4 Weeks)"
+              subtitle="Market value by sector over the last 28 days"
+              data={processSectorHistoryForChart(sectorHistory)}
+              lines={[
+                { dataKey: 'ENERG', name: 'Energy', color: '#1e3a5f' },
+                { dataKey: 'BANK', name: 'Banks', color: '#10b981' },
+                { dataKey: 'ICT', name: 'Technology', color: '#8b5cf6' },
+                { dataKey: 'FOOD', name: 'Food', color: '#f59e0b' },
+              ]}
+              height={350}
+            />
+          ) : null}
         </div>
       )}
 
       {/* Investors Tab */}
       {activeTab === 'investors' && (
-        <div>
+        <div className="space-y-6">
+          {/* Today's Investor Flow */}
           {settradeLoading ? (
             <div className="animate-pulse h-96 bg-gray-200 rounded-lg"></div>
           ) : settradeError ? (
@@ -304,6 +495,19 @@ export default function MarketPage() {
               <p className="text-gray-500">No investor data available at this time.</p>
             </Card>
           )}
+
+          {/* Investor Flow Trend (4 weeks) */}
+          {historyLoading ? (
+            <div className="animate-pulse h-64 bg-gray-200 rounded-lg"></div>
+          ) : investorHistory.length > 0 ? (
+            <InvestorFlowTrendChart
+              title="Investor Flow Trend (4 Weeks)"
+              subtitle="Buy/Sell volume and net flow by Foreign Investors over the last 28 days"
+              data={processInvestorHistoryForFlowChart(investorHistory)}
+              primaryInvestor="FOREIGN"
+              height={400}
+            />
+          ) : null}
         </div>
       )}
 
