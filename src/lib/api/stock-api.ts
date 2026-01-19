@@ -157,9 +157,31 @@ export function getApiProvider(): ApiProvider {
 
 /**
  * Validate API key is configured
+ * Note: Yahoo Finance doesn't require an API key
  */
 export function validateApiKey(): boolean {
+  // Yahoo Finance doesn't require an API key
+  if (API_PROVIDER === 'yahoo') {
+    return true;
+  }
+  // FMP and Alpha Vantage require an API key
   return !!STOCK_API_KEY && STOCK_API_KEY !== 'your_api_key_here';
+}
+
+/**
+ * Get API validation status for error messages
+ */
+export function getApiValidationStatus(): { valid: boolean; message: string } {
+  if (API_PROVIDER === 'yahoo') {
+    return { valid: true, message: 'Using Yahoo Finance (no API key required)' };
+  }
+  if (!STOCK_API_KEY || STOCK_API_KEY === 'your_api_key_here') {
+    return {
+      valid: false,
+      message: `Missing NEXT_PUBLIC_STOCK_API_KEY environment variable for ${API_PROVIDER.toUpperCase()} provider`,
+    };
+  }
+  return { valid: true, message: `Using ${API_PROVIDER.toUpperCase()} provider` };
 }
 
 /**
