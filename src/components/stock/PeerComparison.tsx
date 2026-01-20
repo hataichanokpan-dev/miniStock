@@ -1,14 +1,17 @@
 /**
  * Peer Comparison Component
- * Compare a stock with its peers in the same sector
- * Shows relative performance on key metrics
+ * Compare a stock with its sector peers and custom-selected stocks
+ * Uses sector standards from sectorStandards.ts
+ * Allows manual input of stock symbols for comparison
+ * Professional investor-friendly design
  */
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import Card from '@/components/ui/Card';
 import { formatPercent, formatNumber, getChangeColor } from '@/lib/format';
+import { getPeerStocks, getSectorForSymbol, getSectorName } from '@/lib/sectorStandards';
 
 interface PeerData {
   symbol: string;
@@ -36,36 +39,11 @@ interface PeerComparisonProps {
   } | null;
 }
 
-// Common peer groups for Thai stocks
-const THAI_PEER_GROUPS: Record<string, string[]> = {
-  'ENERGY': ['PTT', 'PTTEP', 'TOP', 'BCH', 'BDMS'],
-  'BANKING': ['KBANK', 'SCB', 'BBL', 'KTB', 'TMB', 'CIMBT'],
-  'TELECOMMUNICATION': ['AOT', 'ADVANC', 'TRUE', 'DTAC', 'INTUCH'],
-  'PROPERTY': ['AP', 'LH', 'QH', 'SF', 'MEGA'],
-  'AUTOMOTIVE': ['TA', 'HMPRO', 'GPSC', 'SOKE'],
-  'FOOD': ['CPF', 'MFC', 'TFM', 'TUF'],
-  'RETAIL': ['CPALL', 'HMPRO', 'BJC', 'OTCP'],
-};
-
-// Get peer symbols for a given stock symbol
-function getPeerSymbols(symbol: string): string[] {
-  const upperSymbol = symbol.toUpperCase();
-
-  for (const [, peers] of Object.entries(THAI_PEER_GROUPS)) {
-    if (peers.includes(upperSymbol)) {
-      return peers.filter(p => p !== upperSymbol).slice(0, 5);
-    }
-  }
-
-  // Default: return common large caps
-  return ['PTT', 'KBANK', 'AOT', 'ADVANC', 'CPF'];
-}
-
-// Rank value among peers (returns 1-5, with 1 being best)
-function getRank(value: number | null, peers: PeerData[], key: keyof PeerData): number | null {
+// Rank value among peers (returns rank position, with 1 being best)
+function getRank(value: number | null, allData: PeerData[], key: keyof PeerData): number | null {
   if (value == null) return null;
 
-  const allValues = [value, ...peers.map(p => (p[key] as number | null) || 0)].filter(v => v != null && v > 0) as number[];
+  const allValues = allData.map(p => (p[key] as number | null) || 0).filter(v => v != null && v > 0) as number[];
 
   if (allValues.length === 0) return null;
 
@@ -79,10 +57,71 @@ function getRank(value: number | null, peers: PeerData[], key: keyof PeerData): 
   return rank;
 }
 
+// Get rank badge color
+function getRankBadgeColor(rank: number | null, total: number): string {
+  if (rank === null || total === 0) return 'bg-gray-100 text-gray-600';
+  if (rank === 1) return 'bg-green-500 text-white';
+  if (rank === 2) return 'bg-emerald-400 text-white';
+  if (rank === 3) return 'bg-teal-300 text-white';
+  if (rank <= Math.ceil(total / 2)) return 'bg-yellow-100 text-yellow-700';
+  return 'bg-red-100 text-red-700';
+}
+
+// Get performance indicator (better/worse than average)
+function getPerformanceIndicator(value: number, allData: PeerData[], key: keyof PeerData): 'better' | 'worse' | 'neutral' {
+  const values = allData.map(p => (p[key] as number | null) || 0).filter((v): v is number => v != null && v > 0);
+  if (values.length === 0) return 'neutral';
+
+  const avg = values.reduce((a, b) => a + b, 0) / values.length;
+  const isLowerBetter = key === 'peRatio' || key === 'pbRatio' || key === 'deRatio';
+
+  if (Math.abs(value - avg) / avg < 0.05) return 'neutral';
+  return isLowerBetter ? (value < avg ? 'better' : 'worse') : (value > avg ? 'better' : 'worse');
+}
+
 export default function PeerComparison({ symbol, sector, currentMetrics }: PeerComparisonProps) {
   const [peers, setPeers] = useState<PeerData[]>([]);
+  const [customSymbols, setCustomSymbols] = useState<string[]>([]);
+  const [customInput, setCustomInput] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [addingStock, setAddingStock] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Get standard sector peers from sectorStandards.ts
+  const sectorKey = getSectorForSymbol(symbol);
+  const sectorName = sectorKey ? getSectorName(symbol) : sector || 'Unknown';
+  const standardPeers = useMemo(() => {
+    return sectorKey ? getPeerStocks(symbol) : [];
+  }, [symbol, sectorKey]);
+
+  // Fetch peer data for a list of symbols
+  const fetchPeerDataForSymbols = async (symbols: string[]): Promise<PeerData[]> => {
+    const results = await Promise.all(
+      symbols.map(async (peerSymbol) => {
+        try {
+          const res = await fetch(`/api/stock/${peerSymbol}/fundamentals`);
+          if (!res.ok) return null;
+
+          const data = await res.json();
+          return {
+            symbol: peerSymbol,
+            name: data.profile?.name || peerSymbol,
+            peRatio: data.metrics?.peRatio,
+            pbRatio: data.metrics?.pbRatio,
+            dividendYield: data.metrics?.dividendYield,
+            roe: data.metrics?.roe,
+            deRatio: data.metrics?.deRatio,
+            marketCap: data.profile?.marketCap,
+          } as PeerData;
+        } catch {
+          return null;
+        }
+      })
+    );
+
+    return results.filter((p): p is PeerData => p !== null);
+  };
 
   useEffect(() => {
     async function fetchPeerData() {
@@ -90,34 +129,12 @@ export default function PeerComparison({ symbol, sector, currentMetrics }: PeerC
         setLoading(true);
         setError(null);
 
-        const peerSymbols = getPeerSymbols(symbol);
+        // Use standard sector peers
+        const peerSymbols = standardPeers.slice(0, 5); // Limit to 5 standard peers for cleaner display
 
-        // Fetch data for each peer
-        const peerData = await Promise.all(
-          peerSymbols.map(async (peerSymbol) => {
-            try {
-              const res = await fetch(`/api/stock/${peerSymbol}/fundamentals`);
-              if (!res.ok) return null;
-
-              const data = await res.json();
-              return {
-                symbol: peerSymbol,
-                name: data.profile?.name || peerSymbol,
-                peRatio: data.metrics?.peRatio,
-                pbRatio: data.metrics?.pbRatio,
-                dividendYield: data.metrics?.dividendYield,
-                roe: data.metrics?.roe,
-                deRatio: data.metrics?.deRatio,
-                marketCap: data.profile?.marketCap,
-              } as PeerData;
-            } catch {
-              return null;
-            }
-          })
-        );
-
-        // Filter out failed fetches
-        setPeers(peerData.filter((p): p is PeerData => p !== null));
+        // Fetch data for standard peers
+        const standardPeerData = await fetchPeerDataForSymbols(peerSymbols);
+        setPeers(standardPeerData);
       } catch (err) {
         console.error('Error fetching peer data:', err);
         setError('Failed to load peer comparison data');
@@ -127,7 +144,52 @@ export default function PeerComparison({ symbol, sector, currentMetrics }: PeerC
     }
 
     fetchPeerData();
-  }, [symbol]);
+  }, [symbol, standardPeers]);
+
+  // Add a custom stock symbol to comparison
+  const addCustomStock = async () => {
+    const inputSymbol = customInput.trim().toUpperCase().replace('.BK', '');
+    if (!inputSymbol) return;
+
+    // Check if already in comparison (either in peers or custom)
+    const allSymbols = [symbol, ...peers.map(p => p.symbol), ...customSymbols];
+    if (allSymbols.includes(inputSymbol)) {
+      setCustomInput('');
+      return;
+    }
+
+    setAddingStock(true);
+    try {
+      const customPeerData = await fetchPeerDataForSymbols([inputSymbol]);
+      if (customPeerData.length > 0) {
+        setCustomSymbols([...customSymbols, inputSymbol]);
+        setPeers([...peers, ...customPeerData]);
+      }
+      setCustomInput('');
+    } catch (err) {
+      console.error('Error adding custom stock:', err);
+    } finally {
+      setAddingStock(false);
+      if (inputRef.current) {
+        inputRef.current.focus();
+      }
+    }
+  };
+
+  // Remove a stock from comparison (works for both custom and standard peers)
+  const removeStock = (stockSymbol: string) => {
+    // If it's a custom stock, also remove from custom symbols
+    if (customSymbols.includes(stockSymbol)) {
+      setCustomSymbols(customSymbols.filter(s => s !== stockSymbol));
+    }
+    // Remove from peers
+    setPeers(peers.filter(p => p.symbol !== stockSymbol));
+  };
+
+  // Check if a stock is custom (not from standard peers)
+  const isCustomStock = (stockSymbol: string) => {
+    return customSymbols.includes(stockSymbol);
+  };
 
   if (loading) {
     return (
@@ -140,140 +202,283 @@ export default function PeerComparison({ symbol, sector, currentMetrics }: PeerC
     );
   }
 
-  if (error || peers.length === 0) {
+  if (error && peers.length === 0) {
     return (
       <Card title="Peer Comparison" subtitle="Compare with sector peers">
         <div className="text-center py-6 text-gray-500">
-          <p className="text-sm">{error || 'No peer data available'}</p>
-          <p className="text-xs mt-1">Peer comparison is available for Thai stocks</p>
+          <p className="text-sm">{error}</p>
+          <p className="text-xs mt-1">Peer comparison is available for Thai SET stocks</p>
         </div>
       </Card>
     );
   }
 
   const metrics = [
-    { key: 'peRatio' as const, label: 'P/E Ratio', format: (v: number) => v.toFixed(1) + 'x', lowerBetter: true },
-    { key: 'pbRatio' as const, label: 'P/B Ratio', format: (v: number) => v.toFixed(1) + 'x', lowerBetter: true },
-    { key: 'dividendYield' as const, label: 'Dividend Yield', format: (v: number) => formatPercent(v * 100), lowerBetter: false },
-    { key: 'roe' as const, label: 'ROE', format: (v: number) => v.toFixed(1) + '%', lowerBetter: false },
-    { key: 'deRatio' as const, label: 'Debt/Equity', format: (v: number) => v.toFixed(2), lowerBetter: true },
-    { key: 'marketCap' as const, label: 'Market Cap', format: (v: number) => formatNumber(v) + 'M', lowerBetter: false },
+    { key: 'peRatio' as const, label: 'P/E Ratio', format: (v: number) => v.toFixed(1) + 'x', lowerBetter: true, description: 'Price to Earnings' },
+    { key: 'pbRatio' as const, label: 'P/B Ratio', format: (v: number) => v.toFixed(2) + 'x', lowerBetter: true, description: 'Price to Book' },
+    { key: 'dividendYield' as const, label: 'Dividend Yield', format: (v: number) => formatPercent(v * 100), lowerBetter: false, description: 'Annual dividend return' },
+    { key: 'roe' as const, label: 'ROE', format: (v: number) => v.toFixed(1) + '%', lowerBetter: false, description: 'Return on Equity' },
   ];
 
-  // Calculate summary stats
-  const getMetricSummary = (key: keyof PeerData) => {
-    const values = peers.map(p => p[key] as number).filter((v): v is number => v !== undefined && v > 0);
-    if (values.length === 0) return { min: 0, max: 0, avg: 0 };
-
-    return {
-      min: Math.min(...values),
-      max: Math.max(...values),
-      avg: values.reduce((a, b) => a + b, 0) / values.length,
-    };
+  // Create data array with current stock and all peers for ranking
+  const currentStockData: PeerData = {
+    symbol,
+    name: symbol,
+    peRatio: currentMetrics?.peRatio,
+    pbRatio: currentMetrics?.pbRatio,
+    dividendYield: currentMetrics?.dividendYield,
+    roe: currentMetrics?.roe,
+    deRatio: currentMetrics?.deRatio,
+    marketCap: currentMetrics?.marketCap,
   };
 
+  const allData = [currentStockData, ...peers];
+  const totalStocks = allData.length;
+
+  // Calculate overall performance summary
+  const getOverallScore = (stockData: PeerData) => {
+    let betterCount = 0;
+    let worseCount = 0;
+    let totalMetrics = 0;
+
+    metrics.forEach(metric => {
+      const value = stockData[metric.key] as number | null;
+      if (value != null) {
+        totalMetrics++;
+        const performance = getPerformanceIndicator(value, allData, metric.key);
+        if (performance === 'better') betterCount++;
+        else if (performance === 'worse') worseCount++;
+      }
+    });
+
+    return { betterCount, worseCount, totalMetrics };
+  };
+
+  const currentScore = getOverallScore(currentStockData);
+
   return (
-    <Card title="Peer Comparison" subtitle={`Compare ${symbol} with sector peers`}>
-      <div className="space-y-4">
-        {/* Peer List with Rankings */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-200">
-                <th className="text-left py-2 px-3 font-semibold text-gray-700">Metric</th>
-                <th className="text-center py-2 px-3 font-semibold text-gray-700">{symbol}</th>
-                {peers.map((peer) => (
-                  <th key={peer.symbol} className="text-center py-2 px-3 font-semibold text-gray-700">
-                    {peer.symbol}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {metrics.map((metric) => {
-                const currentValue = currentMetrics?.[metric.key];
-                const currentRank = currentValue != null ? getRank(currentValue, peers, metric.key) : null;
-                const summary = getMetricSummary(metric.key);
-
-                return (
-                  <tr key={metric.key} className="border-b border-gray-100">
-                    <td className="py-2 px-3 text-gray-600">{metric.label}</td>
-                    {/* Current Stock */}
-                    <td className="py-2 px-3 text-center">
-                      <div className="inline-flex items-center gap-2">
-                        {currentRank !== null && currentRank <= 3 && (
-                          <span className={`text-xs font-bold ${
-                            currentRank === 1 ? 'text-green-600' : currentRank === 2 ? 'text-yellow-600' : 'text-orange-600'
-                          }`}>
-                            #{currentRank}
-                          </span>
-                        )}
-                        <span className="font-bold text-[#1e3a5f]">
-                          {currentValue != null ? metric.format(currentValue) : 'N/A'}
-                        </span>
-                      </div>
-                    </td>
-                    {/* Peers */}
-                    {peers.map((peer) => {
-                      const peerValue = peer[metric.key] as number | undefined;
-                      const peerRank = peerValue != null ? getRank(peerValue, peers, metric.key) : null;
-
-                      return (
-                        <td key={peer.symbol} className="py-2 px-3 text-center text-gray-700">
-                          <div className="inline-flex items-center gap-1">
-                            {peerRank !== null && peerRank <= 3 && (
-                              <span className={`text-xs font-bold ${
-                                peerRank === 1 ? 'text-green-600' : peerRank === 2 ? 'text-yellow-600' : 'text-orange-600'
-                              }`}>
-                                #{peerRank}
-                              </span>
-                            )}
-                            <span>{peerValue !== undefined ? metric.format(peerValue) : 'N/A'}</span>
-                          </div>
-                        </td>
-                      );
-                    })}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+    <Card
+      title="Peer Comparison"
+      subtitle={`${symbolName(symbol, sectorName)} - Comparing with ${peers.length} peer${peers.length !== 1 ? 's' : ''}`}
+    >
+      <div className="space-y-4 sm:space-y-5">
+        {/* Overall Score Card */}
+        <div className="bg-gradient-to-r from-slate-50 to-blue-50 rounded-lg p-3 sm:p-4 border border-slate-200">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="flex-1">
+              <h3 className="text-xs sm:text-sm font-bold text-gray-800 mb-1">Overall Performance vs Peers</h3>
+              <p className="text-[10px] sm:text-xs text-gray-600">
+                Comparing {symbol} against {peers.length} peer{peers.length !== 1 ? 's' : ''} in {sectorName}
+              </p>
+            </div>
+            {currentScore.totalMetrics > 0 && (
+              <div className="flex items-center gap-3">
+                <div className="text-center">
+                  <div className={`text-xl sm:text-2xl font-bold ${currentScore.betterCount > currentScore.worseCount ? 'text-green-600' : currentScore.worseCount > currentScore.betterCount ? 'text-red-600' : 'text-gray-600'}`}>
+                    {currentScore.betterCount > currentScore.worseCount ? '▲' : currentScore.worseCount > currentScore.betterCount ? '▼' : '→'}
+                  </div>
+                  <div className="text-[10px] sm:text-xs text-gray-500">
+                    {currentScore.betterCount} Better / {currentScore.worseCount} Worse
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Summary Stats */}
-        <div className="bg-gray-50 rounded-lg p-4">
-          <h4 className="text-sm font-semibold text-gray-700 mb-3">Sector Averages</h4>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {metrics.map((metric) => {
-              const summary = getMetricSummary(metric.key);
-              return (
-                <div key={metric.key} className="bg-white rounded p-2 border border-gray-200">
-                  <p className="text-xs text-gray-500">{metric.label}</p>
-                  <p className="text-sm font-bold text-gray-900">
-                    {summary.avg > 0 ? metric.format(summary.avg) : 'N/A'}
-                  </p>
-                </div>
-              );
-            })}
+        {/* Custom Stock Input */}
+        <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+          <div className="flex flex-col sm:flex-row gap-2">
+            <input
+              ref={inputRef}
+              type="text"
+              value={customInput}
+              onChange={(e) => setCustomInput(e.target.value.toUpperCase())}
+              onKeyPress={(e) => e.key === 'Enter' && addCustomStock()}
+              placeholder="Add stock symbol (e.g., PTT, KBANK)..."
+              className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            <button
+              onClick={addCustomStock}
+              disabled={addingStock || !customInput.trim()}
+              className="px-4 py-2 bg-[#1e3a5f] text-white text-sm font-medium rounded-lg hover:bg-[#2a4a6f] disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+            >
+              {addingStock ? 'Adding...' : 'Add Stock'}
+            </button>
+          </div>
+          {customSymbols.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              <span className="text-xs text-gray-500">Custom:</span>
+              {customSymbols.map((cs) => (
+                <span
+                  key={cs}
+                  className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-700 text-xs rounded-full"
+                >
+                  {cs}
+                  <button
+                    onClick={() => removeStock(cs)}
+                    className="hover:text-purple-900 ml-1"
+                    aria-label={`Remove ${cs}`}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Compact Peer Comparison Table */}
+        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+            <table className="w-full min-w-max text-sm">
+              <thead>
+                <tr className="bg-slate-50 border-b border-gray-200">
+                  <th className="text-left py-2 px-2 sm:px-3 font-semibold text-gray-700 sticky left-0 bg-slate-50 z-10">Metric</th>
+                  <th className="text-center py-2 px-2 sm:px-3 font-semibold text-blue-700 min-w-[100px]">
+                    <div className="flex items-center justify-center gap-1">
+                      <span>{symbol}</span>
+                      <span className="text-[8px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded">YOU</span>
+                    </div>
+                  </th>
+                  {peers.map((peer) => (
+                    <th key={peer.symbol} className="text-center py-2 px-2 sm:px-3 font-semibold text-gray-700 min-w-[90px]">
+                      <div className="flex flex-col items-center gap-1">
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs">{peer.symbol}</span>
+                          <button
+                            onClick={() => removeStock(peer.symbol)}
+                            className="text-gray-300 hover:text-red-500 transition-colors text-base leading-none"
+                            aria-label={`Remove ${peer.symbol}`}
+                            title={`Remove ${peer.symbol} from comparison`}
+                          >
+                            ×
+                          </button>
+                        </div>
+                        {isCustomStock(peer.symbol) && (
+                          <span className="text-[8px] bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded">CUSTOM</span>
+                        )}
+                      </div>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {metrics.map((metric, metricIndex) => {
+                  const currentValue = currentMetrics?.[metric.key];
+                  const currentRank = currentValue != null ? getRank(currentValue, allData, metric.key) : null;
+                  const currentPerformance = currentValue != null ? getPerformanceIndicator(currentValue, allData, metric.key) : 'neutral';
+
+                  return (
+                    <tr key={metric.key} className={`border-b border-gray-100 ${metricIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}>
+                      <td className="py-2.5 px-2 sm:px-3 sticky left-0 z-10 text-xs sm:text-sm">
+                        <div>
+                          <div className="font-medium text-gray-700">{metric.label}</div>
+                          <div className="text-[10px] text-gray-400 hidden sm:block">{metric.description}</div>
+                        </div>
+                      </td>
+                      {/* Current Stock */}
+                      <td className="py-2.5 px-2 sm:px-3 text-center bg-blue-50/30">
+                        <div className="flex flex-col items-center gap-1">
+                          <div className="flex items-center gap-1">
+                            {currentRank !== null && currentRank <= totalStocks && totalStocks > 1 && (
+                              <span className={`text-[9px] sm:text-[10px] font-bold px-1.5 py-0.5 rounded ${getRankBadgeColor(currentRank, totalStocks)}`}>
+                                #{currentRank}
+                              </span>
+                            )}
+                            <span className="font-bold text-[#1e3a5f] text-xs sm:text-sm">
+                              {currentValue != null ? metric.format(currentValue) : 'N/A'}
+                            </span>
+                            {currentPerformance !== 'neutral' && currentValue != null && (
+                              <span className={`text-[10px] ${currentPerformance === 'better' ? 'text-green-500' : 'text-red-500'}`}>
+                                {currentPerformance === 'better' ? '↑' : '↓'}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      {/* Peers */}
+                      {peers.map((peer) => {
+                        const peerValue = peer[metric.key] as number | undefined;
+                        const peerRank = peerValue != null ? getRank(peerValue, allData, metric.key) : null;
+                        const peerPerformance = peerValue != null ? getPerformanceIndicator(peerValue, allData, metric.key) : 'neutral';
+
+                        return (
+                          <td key={peer.symbol} className="py-2.5 px-2 sm:px-3 text-center">
+                            <div className="flex flex-col items-center gap-1">
+                              <div className="flex items-center gap-1">
+                                {peerRank !== null && peerRank <= totalStocks && totalStocks > 1 && (
+                                  <span className={`text-[9px] sm:text-[10px] font-bold px-1.5 py-0.5 rounded ${getRankBadgeColor(peerRank, totalStocks)}`}>
+                                    #{peerRank}
+                                  </span>
+                                )}
+                                <span className="text-xs sm:text-sm">{peerValue != null ? metric.format(peerValue) : 'N/A'}</span>
+                                {peerPerformance !== 'neutral' && peerValue != null && (
+                                  <span className={`text-[10px] ${peerPerformance === 'better' ? 'text-green-500' : 'text-red-500'}`}>
+                                    {peerPerformance === 'better' ? '↑' : '↓'}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         </div>
 
         {/* Legend */}
-        <div className="flex items-center gap-4 text-xs text-gray-500">
-          <span className="flex items-center gap-1">
-            <span className="w-4 h-4 bg-green-100 rounded"></span>
-            #1 = Best
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="w-4 h-4 bg-yellow-100 rounded"></span>
-            #2 = Good
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="w-4 h-4 bg-orange-100 rounded"></span>
-            #3 = Average
-          </span>
+        <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+          <h4 className="text-xs font-semibold text-gray-700 mb-2">Legend</h4>
+          <div className="flex flex-wrap gap-3 sm:gap-4 text-[10px] sm:text-xs text-gray-600">
+            <div className="flex items-center gap-1.5">
+              <div className="flex gap-0.5">
+                <span className="w-3 h-3 bg-green-500 rounded"></span>
+                <span className="w-3 h-3 bg-emerald-400 rounded"></span>
+                <span className="w-3 h-3 bg-teal-300 rounded"></span>
+              </div>
+              <span>#1-3 Best</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-3 h-3 bg-yellow-100 rounded"></span>
+              <span>Above Avg</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-3 h-3 bg-red-100 rounded"></span>
+              <span>Below Avg</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-green-500 font-bold">↑</span>
+              <span>↑ Better than avg</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-red-500 font-bold">↓</span>
+              <span>↓ Worse than avg</span>
+            </div>
+          </div>
         </div>
+
+        {/* Info message */}
+        {sectorKey && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <p className="text-xs text-blue-800">
+              <strong>💡 Tip:</strong> Click × next to any stock to remove it from comparison. Add custom stocks to compare across sectors.
+            </p>
+          </div>
+        )}
       </div>
     </Card>
   );
+}
+
+// Helper to format symbol and sector name
+function symbolName(symbol: string, sector: string | null): string {
+  if (sector) {
+    return `${symbol} (${sector})`;
+  }
+  return symbol;
 }

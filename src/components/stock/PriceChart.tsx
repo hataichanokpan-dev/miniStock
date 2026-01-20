@@ -42,6 +42,7 @@ export default function PriceChart({ historicalData, symbol }: PriceChartProps) 
 
   // Determine what data we have available
   const hasDataForMA200 = dataPointCount >= 200;
+  const hasDataForMA150 = dataPointCount >= 150;
   const hasDataForMA50 = dataPointCount >= 50;
   const hasMinimumData = dataPointCount >= 10;
 
@@ -50,6 +51,10 @@ export default function PriceChart({ historicalData, symbol }: PriceChartProps) 
     return hasDataForMA50 ? calculateSMA(historicalData, 50) : [];
   }, [historicalData, hasDataForMA50]);
 
+  const ma150Data = useMemo(() => {
+    return hasDataForMA150 ? calculateSMA(historicalData, 150) : [];
+  }, [historicalData, hasDataForMA150]);
+
   const ma200Data = useMemo(() => {
     return hasDataForMA200 ? calculateSMA(historicalData, 200) : [];
   }, [historicalData, hasDataForMA200]);
@@ -57,20 +62,22 @@ export default function PriceChart({ historicalData, symbol }: PriceChartProps) 
   // Combine data for chart (need to align dates)
   const chartData = useMemo(() => {
     // Start from appropriate index based on available data
-    const startIndex = hasDataForMA200 ? 200 - 1 : hasDataForMA50 ? 50 - 1 : 0;
+    const startIndex = hasDataForMA200 ? 200 - 1 : hasDataForMA150 ? 150 - 1 : hasDataForMA50 ? 50 - 1 : 0;
 
     return historicalData.slice(startIndex).map((point) => {
       const ma50 = ma50Data.find(m => m.date === point.date);
+      const ma150 = ma150Data.find(m => m.date === point.date);
       const ma200 = ma200Data.find(m => m.date === point.date);
 
       return {
         date: point.date,
         price: point.close,
         ma50: ma50?.ma || null,
+        ma150: ma150?.ma || null,
         ma200: ma200?.ma || null,
       };
     });
-  }, [historicalData, ma50Data, ma200Data, hasDataForMA200, hasDataForMA50]);
+  }, [historicalData, ma50Data, ma150Data, ma200Data, hasDataForMA200, hasDataForMA150, hasDataForMA50]);
 
   // Determine trend based on price vs moving averages
   const getTrend = () => {
@@ -104,15 +111,21 @@ export default function PriceChart({ historicalData, symbol }: PriceChartProps) 
         message: `Showing ${dataPointCount} days of price data. Not enough history for MA50 yet.`,
       };
     }
-    if (!hasDataForMA200) {
+    if (!hasDataForMA150) {
       return {
         subtitle: 'Price chart with MA50',
+        message: `Showing ${dataPointCount} days of price data. Not enough history for MA150 yet (need 150 trading days).`,
+      };
+    }
+    if (!hasDataForMA200) {
+      return {
+        subtitle: 'Price chart with MA50 & MA150',
         message: `Showing ${dataPointCount} days of price data. Not enough history for MA200 yet (need 200 trading days).`,
       };
     }
     return {
-      subtitle: 'Price chart with MA50 and MA200',
-      message: `Showing MA50 and MA200 based on ${dataPointCount} trading days.`,
+      subtitle: 'Price chart with MA50, MA150 & MA200',
+      message: `Showing MA50, MA150, and MA200 based on ${dataPointCount} trading days.`,
     };
   };
 
@@ -170,6 +183,7 @@ export default function PriceChart({ historicalData, symbol }: PriceChartProps) 
                   formatter={(value: any, name?: string) => {
                     if (name === 'price') return [`$${value.toFixed(2)}`, 'Price'];
                     if (name === 'ma50') return [`$${value.toFixed(2)}`, 'MA50'];
+                    if (name === 'ma150') return [`$${value.toFixed(2)}`, 'MA150'];
                     if (name === 'ma200') return [`$${value.toFixed(2)}`, 'MA200'];
                     return [value, name || ''];
                   }}
@@ -193,10 +207,22 @@ export default function PriceChart({ historicalData, symbol }: PriceChartProps) 
                   <Line
                     type="monotone"
                     dataKey="ma50"
-                    stroke="#f59e0b"
+                    stroke="#fbbf24"
                     strokeWidth={1.5}
                     dot={false}
                     name="MA50"
+                    strokeDasharray="5 5"
+                  />
+                )}
+                {/* MA150 Line */}
+                {hasDataForMA150 && (
+                  <Line
+                    type="monotone"
+                    dataKey="ma150"
+                    stroke="#f97316"
+                    strokeWidth={1.5}
+                    dot={false}
+                    name="MA150"
                     strokeDasharray="5 5"
                   />
                 )}
@@ -221,8 +247,9 @@ export default function PriceChart({ historicalData, symbol }: PriceChartProps) 
             <p className="text-xs text-blue-800">
               <strong>Moving Averages:</strong>{' '}
               {chartInfo.message}
-              {hasDataForMA50 && ' MA50 shows short-term trend.'}
-              {hasDataForMA200 && ' MA200 shows long-term trend.'}
+              {hasDataForMA50 && ' MA50 (yellow) shows short-term trend.'}
+              {hasDataForMA150 && ' MA150 (orange) shows medium-term trend.'}
+              {hasDataForMA200 && ' MA200 (red) shows long-term trend.'}
               {hasDataForMA200 && ' When price crosses above MA50 = Bullish signal. Below MA200 = Bearish signal.'}
             </p>
           </div>
