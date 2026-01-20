@@ -38,14 +38,26 @@ function calculateSMA(data: PriceDataPoint[], period: number): Array<{ date: str
 }
 
 export default function PriceChart({ historicalData, symbol }: PriceChartProps) {
-  // Calculate moving averages
-  const ma50Data = useMemo(() => calculateSMA(historicalData, 50), [historicalData]);
-  const ma200Data = useMemo(() => calculateSMA(historicalData, 200), [historicalData]);
+  const dataPointCount = historicalData.length;
+
+  // Determine what data we have available
+  const hasDataForMA200 = dataPointCount >= 200;
+  const hasDataForMA50 = dataPointCount >= 50;
+  const hasMinimumData = dataPointCount >= 10;
+
+  // Calculate moving averages based on available data
+  const ma50Data = useMemo(() => {
+    return hasDataForMA50 ? calculateSMA(historicalData, 50) : [];
+  }, [historicalData, hasDataForMA50]);
+
+  const ma200Data = useMemo(() => {
+    return hasDataForMA200 ? calculateSMA(historicalData, 200) : [];
+  }, [historicalData, hasDataForMA200]);
 
   // Combine data for chart (need to align dates)
   const chartData = useMemo(() => {
-    // Start from where MA200 data begins
-    const startIndex = 200 - 1;
+    // Start from appropriate index based on available data
+    const startIndex = hasDataForMA200 ? 200 - 1 : hasDataForMA50 ? 50 - 1 : 0;
 
     return historicalData.slice(startIndex).map((point) => {
       const ma50 = ma50Data.find(m => m.date === point.date);
@@ -58,9 +70,7 @@ export default function PriceChart({ historicalData, symbol }: PriceChartProps) 
         ma200: ma200?.ma || null,
       };
     });
-  }, [historicalData, ma50Data, ma200Data]);
-
-  const hasValidChartData = chartData.length >= 2;
+  }, [historicalData, ma50Data, ma200Data, hasDataForMA200, hasDataForMA50]);
 
   // Determine trend based on price vs moving averages
   const getTrend = () => {
@@ -80,12 +90,40 @@ export default function PriceChart({ historicalData, symbol }: PriceChartProps) 
 
   const trend = getTrend();
 
+  // Get subtitle and message based on data availability
+  const getChartInfo = () => {
+    if (!hasMinimumData) {
+      return {
+        subtitle: 'Insufficient historical data',
+        message: `Not enough history to display chart (${dataPointCount} data points available)`,
+      };
+    }
+    if (!hasDataForMA50) {
+      return {
+        subtitle: 'Price chart available',
+        message: `Showing ${dataPointCount} days of price data. Not enough history for MA50 yet.`,
+      };
+    }
+    if (!hasDataForMA200) {
+      return {
+        subtitle: 'Price chart with MA50',
+        message: `Showing ${dataPointCount} days of price data. Not enough history for MA200 yet (need 200 trading days).`,
+      };
+    }
+    return {
+      subtitle: 'Price chart with MA50 and MA200',
+      message: `Showing MA50 and MA200 based on ${dataPointCount} trading days.`,
+    };
+  };
+
+  const chartInfo = getChartInfo();
+
   return (
     <Card
       title="Price Chart with Moving Averages"
-      subtitle={hasValidChartData ? `Showing MA50 and MA200` : 'Insufficient data for moving averages'}
+      subtitle={chartInfo.subtitle}
     >
-      {hasValidChartData ? (
+      {hasMinimumData ? (
         <div>
           {/* Trend Indicator */}
           {trend && (
@@ -151,35 +189,41 @@ export default function PriceChart({ historicalData, symbol }: PriceChartProps) 
                   name="Price"
                 />
                 {/* MA50 Line */}
-                <Line
-                  type="monotone"
-                  dataKey="ma50"
-                  stroke="#f59e0b"
-                  strokeWidth={1.5}
-                  dot={false}
-                  name="MA50"
-                  strokeDasharray="5 5"
-                />
+                {hasDataForMA50 && (
+                  <Line
+                    type="monotone"
+                    dataKey="ma50"
+                    stroke="#f59e0b"
+                    strokeWidth={1.5}
+                    dot={false}
+                    name="MA50"
+                    strokeDasharray="5 5"
+                  />
+                )}
                 {/* MA200 Line */}
-                <Line
-                  type="monotone"
-                  dataKey="ma200"
-                  stroke="#ef4444"
-                  strokeWidth={1.5}
-                  dot={false}
-                  name="MA200"
-                  strokeDasharray="5 5"
-                />
+                {hasDataForMA200 && (
+                  <Line
+                    type="monotone"
+                    dataKey="ma200"
+                    stroke="#ef4444"
+                    strokeWidth={1.5}
+                    dot={false}
+                    name="MA200"
+                    strokeDasharray="5 5"
+                  />
+                )}
               </LineChart>
             </ResponsiveContainer>
           </div>
 
-          {/* Moving Average Explanation */}
+          {/* Info message */}
           <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
             <p className="text-xs text-blue-800">
               <strong>Moving Averages:</strong>{' '}
-              MA50 (50-day) shows short-term trend. MA200 (200-day) shows long-term trend.
-              When price crosses above MA50 = Bullish signal. Below MA200 = Bearish signal.
+              {chartInfo.message}
+              {hasDataForMA50 && ' MA50 shows short-term trend.'}
+              {hasDataForMA200 && ' MA200 shows long-term trend.'}
+              {hasDataForMA200 && ' When price crosses above MA50 = Bullish signal. Below MA200 = Bearish signal.'}
             </p>
           </div>
         </div>
@@ -187,8 +231,12 @@ export default function PriceChart({ historicalData, symbol }: PriceChartProps) 
         <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg border border-gray-200">
           <div className="text-center">
             <span className="text-3xl mb-2">📈</span>
-            <p className="text-sm text-gray-500">Insufficient data for moving averages</p>
-            <p className="text-xs text-gray-400 mt-1">Need at least 200 trading days of historical data</p>
+            <p className="text-sm text-gray-500">Not enough historical data yet</p>
+            <p className="text-xs text-gray-400 mt-1">
+              {dataPointCount === 0
+                ? 'No historical data available for this symbol'
+                : `Only ${dataPointCount} trading days available. Need at least 10 to display chart.`}
+            </p>
           </div>
         </div>
       )}

@@ -4,19 +4,22 @@
  */
 
 export interface FinancialMetrics {
-  revenue: number;
-  revenueGrowth: number;
-  netIncome: number;
-  profitMargin: number;
-  peRatio: number;
-  pbRatio: number;
-  roe: number;
-  deRatio: number;
-  eps: number;
-  epsGrowth: number;
-  freeCashFlow: number;
-  dividendYield: number;
-  marketCap: number;
+  revenue: number | null;
+  revenueGrowth: number | null;
+  netIncome: number | null;
+  profitMargin: number | null;
+  grossMargin: number | null;
+  operatingMargin: number | null;
+  peRatio: number | null;
+  pbRatio: number | null;
+  roe: number | null;
+  deRatio: number | null;
+  interestCoverage: number | null;
+  eps: number | null;
+  epsGrowth: number | null;
+  freeCashFlow: number | null;
+  dividendYield: number | null;
+  marketCap: number | null;
 }
 
 export interface QuarterlyData {

@@ -18,13 +18,13 @@ interface ValuationCardProps {
   symbol: string;
   currentPrice: number;
   metrics?: {
-    peRatio?: number;
-    pbRatio?: number;
-    eps?: number; // Earnings per share
-    bookValuePerShare?: number;
-    dividendYield?: number;
-    revenueGrowth?: number;
-    deRatio?: number;
+    peRatio?: number | null;
+    pbRatio?: number | null;
+    eps?: number | null; // Earnings per share
+    bookValuePerShare?: number | null;
+    dividendYield?: number | null;
+    revenueGrowth?: number | null;
+    deRatio?: number | null;
   } | null;
 }
 
@@ -82,8 +82,8 @@ function calculateDCF(
 // Graham Number Calculator
 // Formula: sqrt(22.5 * EPS * Book Value per Share)
 function calculateGrahamNumber(
-  eps: number | undefined,
-  bookValue: number | undefined
+  eps: number | null,
+  bookValue: number | null
 ): ValuationResult | null {
   if (!eps || !bookValue || eps <= 0 || bookValue <= 0) {
     return null;
@@ -136,15 +136,15 @@ export default function ValuationCard({ symbol, currentPrice, metrics }: Valuati
   const [years, setYears] = useState(5);
 
   // Calculate DCF valuation
-  const dcfValuation = metrics?.eps
+  const dcfValuation = metrics?.eps != null
     ? calculateDCF(metrics.eps, growthRate, discountRate, 3, years)
     : null;
 
   // Calculate Graham Number valuation
-  const grahamValuation = calculateGrahamNumber(metrics?.eps, metrics?.bookValuePerShare);
+  const grahamValuation = calculateGrahamNumber(metrics?.eps ?? null, metrics?.bookValuePerShare ?? null);
 
   // Get P/E historical comparison
-  const peComparison = metrics?.peRatio ? getPEHistoricalComparison(metrics.peRatio) : null;
+  const peComparison = metrics?.peRatio != null ? getPEHistoricalComparison(metrics.peRatio) : null;
 
   // Determine overall valuation status
   const getOverallStatus = (): 'Undervalued' | 'Fair' | 'Overvalued' => {
@@ -409,11 +409,11 @@ export default function ValuationCard({ symbol, currentPrice, metrics }: Valuati
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-white border border-gray-200 rounded-lg p-3">
                   <p className="text-xs text-gray-500">EPS</p>
-                  <p className="text-sm font-bold text-gray-900">${metrics?.eps?.toFixed(2) || 'N/A'}</p>
+                  <p className="text-sm font-bold text-gray-900">${metrics?.eps != null ? metrics.eps.toFixed(2) : 'N/A'}</p>
                 </div>
                 <div className="bg-white border border-gray-200 rounded-lg p-3">
                   <p className="text-xs text-gray-500">Book Value/Share</p>
-                  <p className="text-sm font-bold text-gray-900">${metrics?.bookValuePerShare?.toFixed(2) || 'N/A'}</p>
+                  <p className="text-sm font-bold text-gray-900">${metrics?.bookValuePerShare != null ? metrics.bookValuePerShare.toFixed(2) : 'N/A'}</p>
                 </div>
               </div>
             </div>
@@ -436,15 +436,15 @@ export default function ValuationCard({ symbol, currentPrice, metrics }: Valuati
                   <div>
                     <p className="text-xs text-gray-500">Current P/E</p>
                     <p className="text-2xl font-bold text-[#1e3a5f]">
-                      {metrics?.peRatio?.toFixed(2) || 'N/A'}x
+                      {metrics?.peRatio != null ? metrics.peRatio.toFixed(2) + 'x' : 'N/A'}
                     </p>
                   </div>
                   <div className="text-right">
                     <p className="text-xs text-gray-500">vs 5-Year Avg</p>
                     <p className={`text-lg font-bold ${getChangeColor(
-                      ((metrics?.peRatio || 0) - peComparison.fiveYearAvg) / peComparison.fiveYearAvg * 100
+                      ((metrics?.peRatio ?? 0) - peComparison.fiveYearAvg) / peComparison.fiveYearAvg * 100
                     )}`}>
-                      {metrics?.peRatio && peComparison.fiveYearAvg
+                      {metrics?.peRatio != null && peComparison.fiveYearAvg
                         ? ((metrics.peRatio - peComparison.fiveYearAvg) / peComparison.fiveYearAvg * 100 >= 0 ? '+' : '') +
                           formatPercent((metrics.peRatio - peComparison.fiveYearAvg) / peComparison.fiveYearAvg * 100)
                         : 'N/A'}
@@ -461,7 +461,7 @@ export default function ValuationCard({ symbol, currentPrice, metrics }: Valuati
                   <div
                     className="absolute top-0 h-full w-1 bg-white border-2 border-gray-800"
                     style={{
-                      left: `${((metrics?.peRatio || peComparison.fiveYearAvg) - peComparison.low) / (peComparison.high - peComparison.low) * 100}%`,
+                      left: `${((metrics?.peRatio ?? peComparison.fiveYearAvg) - peComparison.low) / (peComparison.high - peComparison.low) * 100}%`,
                     }}
                   ></div>
                   <div className="absolute inset-0 flex items-center justify-center text-xs font-bold text-white">
@@ -490,9 +490,9 @@ export default function ValuationCard({ symbol, currentPrice, metrics }: Valuati
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                 <p className="text-xs text-blue-800">
                   <strong>P/E Interpretation:</strong>{' '}
-                  {metrics?.peRatio && metrics.peRatio < peComparison.fiveYearAvg
+                  {metrics?.peRatio != null && metrics.peRatio < peComparison.fiveYearAvg
                     ? 'Current P/E is below 5-year average, potentially undervalued.'
-                    : metrics?.peRatio && metrics.peRatio > peComparison.fiveYearAvg
+                    : metrics?.peRatio != null && metrics.peRatio > peComparison.fiveYearAvg
                     ? 'Current P/E is above 5-year average, potentially overvalued.'
                     : 'Current P/E is near 5-year average, fairly valued.'}
                 </p>

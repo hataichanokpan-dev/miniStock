@@ -13,26 +13,26 @@ import { formatPercent, formatNumber, getChangeColor } from '@/lib/format';
 interface PeerData {
   symbol: string;
   name: string;
-  peRatio?: number;
-  pbRatio?: number;
-  dividendYield?: number;
-  roe?: number;
-  deRatio?: number;
-  marketCap?: number;
-  price?: number;
-  changePercent?: number;
+  peRatio?: number | null;
+  pbRatio?: number | null;
+  dividendYield?: number | null;
+  roe?: number | null;
+  deRatio?: number | null;
+  marketCap?: number | null;
+  price?: number | null;
+  changePercent?: number | null;
 }
 
 interface PeerComparisonProps {
   symbol: string;
   sector?: string;
   currentMetrics?: {
-    peRatio?: number;
-    pbRatio?: number;
-    dividendYield?: number;
-    roe?: number;
-    deRatio?: number;
-    marketCap?: number;
+    peRatio?: number | null;
+    pbRatio?: number | null;
+    dividendYield?: number | null;
+    roe?: number | null;
+    deRatio?: number | null;
+    marketCap?: number | null;
   } | null;
 }
 
@@ -62,10 +62,10 @@ function getPeerSymbols(symbol: string): string[] {
 }
 
 // Rank value among peers (returns 1-5, with 1 being best)
-function getRank(value: number | undefined, peers: PeerData[], key: keyof PeerData): number | null {
-  if (value === undefined) return null;
+function getRank(value: number | null, peers: PeerData[], key: keyof PeerData): number | null {
+  if (value == null) return null;
 
-  const allValues = [value, ...peers.map(p => (p[key] as number) || 0)].filter(v => v > 0);
+  const allValues = [value, ...peers.map(p => (p[key] as number | null) || 0)].filter(v => v != null && v > 0) as number[];
 
   if (allValues.length === 0) return null;
 
@@ -192,7 +192,7 @@ export default function PeerComparison({ symbol, sector, currentMetrics }: PeerC
             <tbody>
               {metrics.map((metric) => {
                 const currentValue = currentMetrics?.[metric.key];
-                const currentRank = currentValue !== undefined ? getRank(currentValue, peers, metric.key) : null;
+                const currentRank = currentValue != null ? getRank(currentValue, peers, metric.key) : null;
                 const summary = getMetricSummary(metric.key);
 
                 return (
@@ -209,14 +209,14 @@ export default function PeerComparison({ symbol, sector, currentMetrics }: PeerC
                           </span>
                         )}
                         <span className="font-bold text-[#1e3a5f]">
-                          {currentValue !== undefined ? metric.format(currentValue) : 'N/A'}
+                          {currentValue != null ? metric.format(currentValue) : 'N/A'}
                         </span>
                       </div>
                     </td>
                     {/* Peers */}
                     {peers.map((peer) => {
-                      const peerValue = peer[metric.key] as number;
-                      const peerRank = getRank(peerValue, peers, metric.key);
+                      const peerValue = peer[metric.key] as number | undefined;
+                      const peerRank = peerValue != null ? getRank(peerValue, peers, metric.key) : null;
 
                       return (
                         <td key={peer.symbol} className="py-2 px-3 text-center text-gray-700">

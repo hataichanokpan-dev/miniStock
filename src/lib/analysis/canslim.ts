@@ -226,17 +226,20 @@ function scoreLeader(input: CanslimInput): number {
 
   let score = 0;
 
+  const roe = financialMetrics.roe ?? 0;
+  const profitMargin = financialMetrics.profitMargin ?? 0;
+
   // ROE comparison (assuming 15% is good benchmark)
-  if (financialMetrics.roe >= 20) score += 50;
-  else if (financialMetrics.roe >= 15) score += 40;
-  else if (financialMetrics.roe >= 10) score += 30;
-  else if (financialMetrics.roe >= 5) score += 15;
+  if (roe >= 20) score += 50;
+  else if (roe >= 15) score += 40;
+  else if (roe >= 10) score += 30;
+  else if (roe >= 5) score += 15;
 
   // Profit margin comparison
-  if (financialMetrics.profitMargin >= 20) score += 50;
-  else if (financialMetrics.profitMargin >= 15) score += 40;
-  else if (financialMetrics.profitMargin >= 10) score += 30;
-  else if (financialMetrics.profitMargin >= 5) score += 15;
+  if (profitMargin >= 20) score += 50;
+  else if (profitMargin >= 15) score += 40;
+  else if (profitMargin >= 10) score += 30;
+  else if (profitMargin >= 5) score += 15;
 
   return Math.min(100, score);
 }

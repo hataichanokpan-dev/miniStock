@@ -39,9 +39,9 @@ export function calculateQualityMetrics(input: QualityInput): QualityMetrics {
 export function calculateGrossMargin(input: QualityInput): number {
   const { financialMetrics } = input;
 
-  // Using profit margin as proxy
-  // In a full implementation, this would use actual COGS data
-  const grossMargin = financialMetrics.profitMargin * 1.5; // Approximate conversion
+  // Use grossMargin if available, otherwise estimate from profitMargin
+  const profitMargin = financialMetrics.profitMargin ?? 0;
+  const grossMargin = financialMetrics.grossMargin ?? (profitMargin * 1.5); // Approximate conversion
 
   return Math.min(100, Math.max(0, grossMargin));
 }
@@ -53,9 +53,9 @@ export function calculateGrossMargin(input: QualityInput): number {
 export function calculateOperatingMargin(input: QualityInput): number {
   const { financialMetrics } = input;
 
-  // Using profit margin as proxy
-  // In a full implementation, this would use actual operating income data
-  const operatingMargin = financialMetrics.profitMargin * 1.2;
+  // Use operatingMargin if available, otherwise estimate from profitMargin
+  const profitMargin = financialMetrics.profitMargin ?? 0;
+  const operatingMargin = financialMetrics.operatingMargin ?? (profitMargin * 1.2);
 
   return Math.min(100, Math.max(0, operatingMargin));
 }
@@ -68,8 +68,8 @@ export function calculateOperatingMargin(input: QualityInput): number {
 export function calculateFCFConversionRatio(input: QualityInput): number {
   const { financialMetrics, annualData } = input;
 
-  const netIncome = financialMetrics.netIncome || 0;
-  const freeCashFlow = financialMetrics.freeCashFlow || 0;
+  const netIncome = financialMetrics.netIncome ?? 0;
+  const freeCashFlow = financialMetrics.freeCashFlow ?? 0;
 
   if (netIncome <= 0) return 0;
 
