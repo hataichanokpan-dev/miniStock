@@ -8,10 +8,50 @@
 
 'use client';
 
-import { useEffect, useState, useRef, useMemo } from 'react';
+import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import Card from '@/components/ui/Card';
 import { formatPercent, formatNumber, getChangeColor } from '@/lib/format';
 import { getPeerStocks, getSectorForSymbol, getSectorName } from '@/lib/sectorStandards';
+
+/**
+ * Normalize a stock symbol to a consistent format
+ * - Trims whitespace
+ * - Converts to uppercase
+ * - Appends .BK suffix for Thai stocks if not already present
+ */
+function normalizeSymbol(symbol: string): string {
+  const trimmed = symbol.trim();
+  const upperSymbol = trimmed.toUpperCase();
+
+  // If symbol already contains a dot, assume it has a market suffix
+  if (upperSymbol.includes('.')) {
+    return upperSymbol;
+  }
+
+  // For Thai stocks, append .BK suffix (typical Thai stock symbols are 2-6 letters)
+  const thaiStockPattern = /^[A-Z]{2,6}$/;
+  if (thaiStockPattern.test(upperSymbol)) {
+    return `${upperSymbol}.BK`;
+  }
+
+  return upperSymbol;
+}
+
+/**
+ * Extract base symbol without market suffix (for duplicate checking)
+ */
+function getBaseSymbol(symbol: string): string {
+  const normalized = normalizeSymbol(symbol);
+  const parts = normalized.split('.');
+  return parts[0].toUpperCase();
+}
+
+/**
+ * Compare two symbols, normalizing both for comparison
+ */
+function symbolsEqual(symbol1: string, symbol2: string): boolean {
+  return getBaseSymbol(symbol1) === getBaseSymbol(symbol2);
+}
 
 interface PeerData {
   symbol: string;
@@ -86,6 +126,7 @@ export default function PeerComparison({ symbol, sector, currentMetrics }: PeerC
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [addingStock, setAddingStock] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Get standard sector peers from sectorStandards.ts
@@ -95,32 +136,46 @@ export default function PeerComparison({ symbol, sector, currentMetrics }: PeerC
     return sectorKey ? getPeerStocks(symbol) : [];
   }, [symbol, sectorKey]);
 
-  // Fetch peer data for a list of symbols
-  const fetchPeerDataForSymbols = async (symbols: string[]): Promise<PeerData[]> => {
-    const results = await Promise.all(
+  // Fetch peer data for a list of symbols with partial success support
+  const fetchPeerDataForSymbols = async (symbols: string[]): Promise<{ successful: PeerData[], failed: string[] }> => {
+    const results = await Promise.allSettled(
       symbols.map(async (peerSymbol) => {
         try {
           const res = await fetch(`/api/stock/${peerSymbol}/fundamentals`);
-          if (!res.ok) return null;
+          if (!res.ok) {
+            throw new Error(`Failed to fetch ${peerSymbol}: ${res.status}`);
+          }
 
           const data = await res.json();
           return {
             symbol: peerSymbol,
             name: data.profile?.name || peerSymbol,
-            peRatio: data.metrics?.peRatio,
-            pbRatio: data.metrics?.pbRatio,
-            dividendYield: data.metrics?.dividendYield,
-            roe: data.metrics?.roe,
-            deRatio: data.metrics?.deRatio,
-            marketCap: data.profile?.marketCap,
+            peRatio: data.metrics?.peRatio ?? null,
+            pbRatio: data.metrics?.pbRatio ?? null,
+            dividendYield: data.metrics?.dividendYield ?? null,
+            roe: data.metrics?.roe ?? null,
+            deRatio: data.metrics?.deRatio ?? null,
+            marketCap: data.profile?.marketCap ?? null,
           } as PeerData;
-        } catch {
-          return null;
+        } catch (err) {
+          console.error(`Error fetching ${peerSymbol}:`, err);
+          throw err;
         }
       })
     );
 
-    return results.filter((p): p is PeerData => p !== null);
+    const successful: PeerData[] = [];
+    const failed: string[] = [];
+
+    results.forEach((result, index) => {
+      if (result.status === 'fulfilled' && result.value) {
+        successful.push(result.value);
+      } else {
+        failed.push(symbols[index]);
+      }
+    });
+
+    return { successful, failed };
   };
 
   useEffect(() => {
@@ -133,7 +188,7 @@ export default function PeerComparison({ symbol, sector, currentMetrics }: PeerC
         const peerSymbols = standardPeers.slice(0, 5); // Limit to 5 standard peers for cleaner display
 
         // Fetch data for standard peers
-        const standardPeerData = await fetchPeerDataForSymbols(peerSymbols);
+        const { successful: standardPeerData } = await fetchPeerDataForSymbols(peerSymbols);
         setPeers(standardPeerData);
       } catch (err) {
         console.error('Error fetching peer data:', err);
@@ -146,50 +201,63 @@ export default function PeerComparison({ symbol, sector, currentMetrics }: PeerC
     fetchPeerData();
   }, [symbol, standardPeers]);
 
-  // Add a custom stock symbol to comparison
-  const addCustomStock = async () => {
-    const inputSymbol = customInput.trim().toUpperCase().replace('.BK', '');
+  // Add a custom stock symbol to comparison (with stale closure fix)
+  const addCustomStock = useCallback(async () => {
+    const inputSymbol = customInput.trim();
     if (!inputSymbol) return;
 
-    // Check if already in comparison (either in peers or custom)
+    const normalizedSymbol = normalizeSymbol(inputSymbol);
+
+    // Check if already in comparison (either in peers or custom) using normalized comparison
     const allSymbols = [symbol, ...peers.map(p => p.symbol), ...customSymbols];
-    if (allSymbols.includes(inputSymbol)) {
+    const isDuplicate = allSymbols.some(s => symbolsEqual(s, normalizedSymbol));
+
+    if (isDuplicate) {
+      setAddError('Already in comparison');
+      setTimeout(() => setAddError(null), 2000);
       setCustomInput('');
       return;
     }
 
     setAddingStock(true);
+    setAddError(null);
+
     try {
-      const customPeerData = await fetchPeerDataForSymbols([inputSymbol]);
-      if (customPeerData.length > 0) {
-        setCustomSymbols([...customSymbols, inputSymbol]);
-        setPeers([...peers, ...customPeerData]);
+      const { successful, failed } = await fetchPeerDataForSymbols([normalizedSymbol]);
+
+      if (successful.length > 0) {
+        // Use functional updates to avoid stale closure
+        setCustomSymbols(prev => [...prev, normalizedSymbol]);
+        setPeers(prev => [...prev, ...successful]);
+        setCustomInput('');
+      } else {
+        setAddError(failed.length > 0 ? 'Could not fetch data' : 'Unknown symbol');
+        setTimeout(() => setAddError(null), 3000);
       }
-      setCustomInput('');
     } catch (err) {
       console.error('Error adding custom stock:', err);
+      setAddError('Could not fetch data');
+      setTimeout(() => setAddError(null), 3000);
     } finally {
       setAddingStock(false);
       if (inputRef.current) {
         inputRef.current.focus();
       }
     }
-  };
+  }, [customInput, symbol, peers, customSymbols]);
 
   // Remove a stock from comparison (works for both custom and standard peers)
-  const removeStock = (stockSymbol: string) => {
+  const removeStock = useCallback((stockSymbol: string) => {
     // If it's a custom stock, also remove from custom symbols
-    if (customSymbols.includes(stockSymbol)) {
-      setCustomSymbols(customSymbols.filter(s => s !== stockSymbol));
-    }
+    setCustomSymbols(prev => prev.filter(s => symbolsEqual(s, stockSymbol)));
     // Remove from peers
-    setPeers(peers.filter(p => p.symbol !== stockSymbol));
-  };
+    setPeers(prev => prev.filter(p => !symbolsEqual(p.symbol, stockSymbol)));
+  }, []);
 
   // Check if a stock is custom (not from standard peers)
-  const isCustomStock = (stockSymbol: string) => {
-    return customSymbols.includes(stockSymbol);
-  };
+  const isCustomStock = useCallback((stockSymbol: string) => {
+    return customSymbols.some(s => symbolsEqual(s, stockSymbol));
+  }, [customSymbols]);
 
   if (loading) {
     return (
@@ -288,44 +356,52 @@ export default function PeerComparison({ symbol, sector, currentMetrics }: PeerC
 
         {/* Custom Stock Input */}
         <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
-          <div className="flex flex-col sm:flex-row gap-2">
-            <input
-              ref={inputRef}
-              type="text"
-              value={customInput}
-              onChange={(e) => setCustomInput(e.target.value.toUpperCase())}
-              onKeyPress={(e) => e.key === 'Enter' && addCustomStock()}
-              placeholder="Add stock symbol (e.g., PTT, KBANK)..."
-              className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-            <button
-              onClick={addCustomStock}
-              disabled={addingStock || !customInput.trim()}
-              className="px-4 py-2 bg-[#1e3a5f] text-white text-sm font-medium rounded-lg hover:bg-[#2a4a6f] disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-            >
-              {addingStock ? 'Adding...' : 'Add Stock'}
-            </button>
-          </div>
-          {customSymbols.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-2">
-              <span className="text-xs text-gray-500">Custom:</span>
-              {customSymbols.map((cs) => (
-                <span
-                  key={cs}
-                  className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-700 text-xs rounded-full"
-                >
-                  {cs}
-                  <button
-                    onClick={() => removeStock(cs)}
-                    className="hover:text-purple-900 ml-1"
-                    aria-label={`Remove ${cs}`}
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input
+                ref={inputRef}
+                type="text"
+                value={customInput}
+                onChange={(e) => setCustomInput(e.target.value.toUpperCase())}
+                onKeyDown={(e) => e.key === 'Enter' && addCustomStock()}
+                placeholder="Add stock symbol (e.g., PTT, KBANK)..."
+                disabled={addingStock}
+                className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+              />
+              <button
+                onClick={addCustomStock}
+                disabled={addingStock || !customInput.trim()}
+                className="px-4 py-2 bg-[#1e3a5f] text-white text-sm font-medium rounded-lg hover:bg-[#2a4a6f] disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+              >
+                {addingStock ? 'Adding...' : 'Add Stock'}
+              </button>
             </div>
-          )}
+            {addError && (
+              <div className="text-xs text-red-600">
+                {addError}
+              </div>
+            )}
+            {customSymbols.length > 0 && (
+              <div className="mt-1 flex flex-wrap gap-2">
+                <span className="text-xs text-gray-500">Custom:</span>
+                {customSymbols.map((cs) => (
+                  <span
+                    key={cs}
+                    className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-700 text-xs rounded-full"
+                  >
+                    {cs}
+                    <button
+                      onClick={() => removeStock(cs)}
+                      className="hover:text-purple-900 ml-1"
+                      aria-label={`Remove ${cs}`}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Compact Peer Comparison Table */}
@@ -387,7 +463,7 @@ export default function PeerComparison({ symbol, sector, currentMetrics }: PeerC
                               </span>
                             )}
                             <span className="font-bold text-[#1e3a5f] text-xs sm:text-sm">
-                              {currentValue != null ? metric.format(currentValue) : 'N/A'}
+                              {currentValue != null ? metric.format(currentValue) : '—'}
                             </span>
                             {currentPerformance !== 'neutral' && currentValue != null && (
                               <span className={`text-[10px] ${currentPerformance === 'better' ? 'text-green-500' : 'text-red-500'}`}>
@@ -412,7 +488,7 @@ export default function PeerComparison({ symbol, sector, currentMetrics }: PeerC
                                     #{peerRank}
                                   </span>
                                 )}
-                                <span className="text-xs sm:text-sm">{peerValue != null ? metric.format(peerValue) : 'N/A'}</span>
+                                <span className="text-xs sm:text-sm">{peerValue != null ? metric.format(peerValue) : '—'}</span>
                                 {peerPerformance !== 'neutral' && peerValue != null && (
                                   <span className={`text-[10px] ${peerPerformance === 'better' ? 'text-green-500' : 'text-red-500'}`}>
                                     {peerPerformance === 'better' ? '↑' : '↓'}
