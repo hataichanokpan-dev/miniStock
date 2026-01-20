@@ -36,7 +36,7 @@ export default function TopRankingsCard({ topByValue, topByVolume }: TopRankings
         <div className="space-y-1">
           {topByValue.slice(0, 8).map((stock, i) => (
             <div
-              key={stock.symbol}
+              key={`value-${stock.symbol}`}
               className="flex items-center justify-between py-1.5 px-2 bg-white border border-gray-100 rounded hover:border-gray-200 transition-colors cursor-pointer group"
               onClick={() => window.location.href = `/stocks/${stock.symbol}.BK`}
             >
@@ -73,7 +73,7 @@ export default function TopRankingsCard({ topByValue, topByVolume }: TopRankings
         <div className="space-y-1">
           {topByVolume.slice(0, 8).map((stock, i) => (
             <div
-              key={stock.symbol}
+              key={`volume-${stock.symbol}`}
               className="flex items-center justify-between py-1.5 px-2 bg-white border border-gray-100 rounded hover:border-gray-200 transition-colors cursor-pointer group"
               onClick={() => window.location.href = `/stocks/${stock.symbol}.BK`}
             >
