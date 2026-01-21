@@ -1,7 +1,16 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git push)"
+      "Bash(git push)",
+      "Bash(npm run build:*)",
+      "Bash(git add:*)",
+      "Bash(gh pr create --title \"feat: Add professional sector benchmarks and peer comparison tools\" --body \"$\\(cat <<''EOF''\n## Summary\nAdd comprehensive sector benchmark and peer comparison tools for Thai SET stocks with professional investor-friendly design.\n\n## Changes\n- **sectorStandards.ts**: Add 14 Thai SET sectors with 2024-2025 benchmarks\n  - SET Index benchmarks: P/E 15.4x, P/B 1.22x, Div Yield 3.7%\n  - 14 sectors: Banking, Energy, Telecom, Property, Automotive, Food, Retail, Healthcare, Technology, Building Materials, Transportation, Insurance, Petrochemicals, Utilities\n  \n- **StandardBenchmarks** \\(new\\): Stock vs SET Index vs Sector comparison\n  - Professional comparison table with color-coded indicators\n  - Quick Analysis Cards \\(Valuation, Yield, Sector Position\\)\n  - Mobile-responsive design\n  \n- **PeerComparison** \\(redesign\\): Enhanced peer comparison\n  - Overall Performance Summary with ▲/▼/→ indicators\n  - Rank badges \\(green #1-3, yellow above avg, red below avg\\)\n  - Performance indicators \\(↑/↓ for better/worse than avg\\)\n  - Custom stock input/removal functionality\n  - Mobile-friendly table with sticky columns\n  \n- **PriceChart**: Add MA150 \\(orange line\\) alongside MA50 \\(yellow\\) and MA200 \\(red\\)\n  \n- **Stock Detail Page**: Add 52-week high/low display with % distance, volume ratio indicator\n\n## Test plan\n- [x] Build succeeds\n- [x] Standard Benchmarks displays correctly for Thai SET stocks\n- [x] Peer Comparison allows adding/removing custom stocks\n- [x] Price Chart shows all 3 MA lines when sufficient data available\n- [x] Mobile responsive design works correctly\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\nEOF\n\\)\")",
+      "Bash(gh pr create:*)",
+      "Bash(git stash push:*)",
+      "Bash(tsc:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run test:*)",
+      "Bash(node:*)"
     ]
   }
 }
