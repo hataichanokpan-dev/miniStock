@@ -227,6 +227,38 @@ For production, implement proper user-based security rules.
 | `npm run build` | Build for production |
 | `npm run start` | Start production server |
 | `npm run lint` | Run ESLint |
+| `npm run test` | Run all tests |
+| `npm run test:watch` | Run tests in watch mode |
+| `npm run test:ui` | Run tests with UI interface |
+
+## Testing
+
+This project uses **Vitest** for unit testing. Test files are located alongside source files with the `.test.ts` suffix.
+
+### Run Tests
+```bash
+npm run test
+```
+
+### Watch Mode (during development)
+```bash
+npm run test:watch
+```
+
+### Test UI
+```bash
+npm run test:ui
+```
+
+### Test Specific File
+```bash
+npm run test -- quality.test
+```
+
+### Test Coverage
+```bash
+npm run test -- --coverage
+```
 
 ## Development Roadmap
 
